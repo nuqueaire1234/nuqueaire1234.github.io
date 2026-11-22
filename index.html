@@ -1,0 +1,2017 @@
+<!doctype html>
+<html lang="fr-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0B2E4F">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<script>window.MPP_PWA = true;</script>
+<title>ProPilot</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Concept : console de passerelle. Fond nuit (préserve la vision nocturne), gros boutons,
+   lectures chiffrées façon instrument, feux de navigation pour le ton des notes
+   (rouge = négatif, vert = positif, ambre = conseil). Mode jour disponible. */
+/* Thèmes v0.14 : nuit = noir OLED + rouge (vision de nuit) ; jour = marin, blanc ou vert.
+   « Automatique » suit le mode du téléphone. */
+:root{
+  --font-display:"Barlow Condensed","Roboto Condensed","Arial Narrow",sans-serif;
+  --font-body:"Barlow",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"Roboto Mono",monospace;
+  --bg:#E8F1F8; --bg2:#F7FAFC; --bar:#0B2E4F; --bar-fg:#FFFFFF; --bar-muted:#9DB7CE; --bar-line:#1D4569; --bar-accent:#7FD3FF;
+  --surface:#FFFFFF; --surface-2:#E1ECF4; --line:#C3D5E3; --fg:#0B1D2C; --muted:#4A6375;
+  --accent:#0A6C9F; --accent-ink:#FFFFFF; --accent-bg:#DCEEF8;
+  --pos:#12804D; --pos-bg:#DCF2E7; --neg:#C32E2E; --neg-bg:#FBE2E2; --warn:#955F00; --warn-bg:#FBEED0;
+  --shadow:rgba(12,29,41,.18); color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme]){
+    --bg:#000; --bg2:#000; --bar:#000; --bar-fg:#FF3B2F; --bar-muted:#9E2A20; --bar-line:#3A0C08; --bar-accent:#FF3B2F;
+    --surface:#080000; --surface-2:#140302; --line:#3A0C08; --fg:#FF3B2F; --muted:#A8352A;
+    --accent:#FF2D1F; --accent-ink:#000; --accent-bg:rgba(255,45,31,.12);
+    --pos:#E0522F; --pos-bg:rgba(224,82,47,.12); --neg:#FF1A1A; --neg-bg:rgba(255,26,26,.18); --warn:#FF7A3D; --warn-bg:rgba(255,122,61,.12);
+    --shadow:rgba(0,0,0,.6); color-scheme:dark;
+  }
+}
+:root[data-theme="nuit"],:root[data-theme="dark"]{
+  --bg:#000; --bg2:#000; --bar:#000; --bar-fg:#FF3B2F; --bar-muted:#9E2A20; --bar-line:#3A0C08; --bar-accent:#FF3B2F;
+  --surface:#080000; --surface-2:#140302; --line:#3A0C08; --fg:#FF3B2F; --muted:#A8352A;
+  --accent:#FF2D1F; --accent-ink:#000; --accent-bg:rgba(255,45,31,.12);
+  --pos:#E0522F; --pos-bg:rgba(224,82,47,.12); --neg:#FF1A1A; --neg-bg:rgba(255,26,26,.18); --warn:#FF7A3D; --warn-bg:rgba(255,122,61,.12);
+  --shadow:rgba(0,0,0,.6); color-scheme:dark;
+}
+:root[data-theme="blanc"]{
+  --bg:#F4F6F8; --bg2:#FFFFFF; --bar:#FFFFFF; --bar-fg:#0C1D29; --bar-muted:#5C7282; --bar-line:#D5DEE5; --bar-accent:#1F4E79;
+  --surface:#FFFFFF; --surface-2:#EAF0F4; --line:#D2DCE3; --fg:#0C1D29; --muted:#4C6474;
+  --accent:#1F4E79; --accent-ink:#FFFFFF; --accent-bg:#E1EBF4;
+  --pos:#12804D; --pos-bg:#DCF2E7; --neg:#C32E2E; --neg-bg:#FBE2E2; --warn:#955F00; --warn-bg:#FBEED0;
+  --shadow:rgba(12,29,41,.14); color-scheme:light;
+}
+:root[data-theme="vert"]{
+  --bg:#E4F2EE; --bg2:#F5FAF8; --bar:#0E4D45; --bar-fg:#FFFFFF; --bar-muted:#9CCBC2; --bar-line:#1F6A60; --bar-accent:#8FF0D8;
+  --surface:#FFFFFF; --surface-2:#DDEEE9; --line:#BFDAD2; --fg:#0D2621; --muted:#466A62;
+  --accent:#0F7B6C; --accent-ink:#FFFFFF; --accent-bg:#D6F0E9;
+  --pos:#12804D; --pos-bg:#DCF2E7; --neg:#C32E2E; --neg-bg:#FBE2E2; --warn:#955F00; --warn-bg:#FBEED0;
+  --shadow:rgba(13,38,33,.16); color-scheme:light;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg) linear-gradient(180deg,var(--bg),var(--bg2)) fixed;color:var(--fg);font:400 17px/1.45 var(--font-body);-webkit-tap-highlight-color:transparent}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--bar)}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.seg-opt input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+.ico{width:24px;height:24px;flex:none}
+.ico.sm{width:18px;height:18px}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* Barre du haut */
+.hdr{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bar);color:var(--bar-fg);border-bottom:1px solid var(--bar-line)}
+.bar{display:flex;align-items:center;gap:6px;min-height:46px;padding-block:2px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+#clock{flex:none;font:800 23px/1 var(--font-mono);font-variant-numeric:tabular-nums;color:var(--bar-fg)}
+#cnt{font:600 16px/1 var(--font-mono);color:var(--bar-fg);white-space:nowrap}
+.bar h1{flex:1;min-width:0;margin:0;font:700 21px/1.1 var(--font-display);letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar h1 .brand{color:var(--bar-accent)}
+.bar .icon-btn{color:var(--bar-fg)}
+.icon-btn{display:inline-grid;place-items:center;width:46px;height:46px;border-radius:12px;border:0;background:transparent;color:var(--fg)}
+.icon-btn.sm{width:38px;height:38px;margin-left:auto;color:var(--muted)}
+#btnBack{margin-left:-10px}
+.bar-act{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border-radius:12px;border:1px solid var(--bar-line);background:rgba(127,127,127,.16);color:var(--bar-fg);font-weight:600;font-size:16px}
+
+/* Contenu */
+main{max-width:720px;margin:0 auto;padding-block:16px calc(104px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:14px;align-content:start}
+.h2{display:flex;align-items:baseline;gap:8px;margin:14px 0 0;font:700 20px/1.2 var(--font-display);letter-spacing:.05em;text-transform:uppercase;text-wrap:balance}
+.h2 .cnt{font:500 15px var(--font-mono);color:var(--muted);letter-spacing:0}
+.sub{color:var(--muted);font-size:15px}
+.stack{display:grid;gap:10px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row>.btn{flex:1 1 140px}
+.empty{margin:0;padding:18px 16px;border:1px dashed var(--line);border-radius:14px;color:var(--muted);text-align:center;font-size:16px}
+.disclaimer{margin:10px 0 0;color:var(--muted);font-size:13px;line-height:1.5}
+.info{margin:0;padding:12px 14px;border-radius:12px;background:var(--accent-bg);font-size:15px}
+.ok-t{color:var(--pos);font-weight:600}
+.warn-t{color:var(--warn);font-weight:600}
+
+/* Lectures façon instrument */
+.readouts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.readout{display:grid;gap:4px;align-content:start;padding:12px 14px 14px;border-radius:14px;border:1px solid var(--line);background:var(--surface);text-align:left;min-width:0}
+.readout .k{font:600 12px var(--font-body);letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+.readout .v{font:500 42px/1 var(--font-mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.readout .v.sm{font-size:24px;line-height:1.15}
+.readout .s{font-size:13px;color:var(--muted)}
+.readout.accent{border-color:var(--accent);background:var(--accent-bg)}
+.readout.big .v{font-size:56px}
+
+/* Accueil */
+.searchbtn{display:flex;align-items:center;gap:10px;width:100%;min-height:54px;padding:0 16px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--muted);font-size:16px;text-align:left}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{display:flex;flex-direction:column;justify-content:space-between;gap:12px;min-height:110px;padding:14px;border-radius:16px;border:1px solid var(--line);background:var(--surface);text-align:left;font:700 22px/1.05 var(--font-display);letter-spacing:.01em}
+.tile .ico{width:34px;height:34px;color:var(--accent)}
+.tile small{display:block;margin-top:5px;font:500 13px/1.3 var(--font-body);letter-spacing:0;color:var(--muted)}
+.tile.wide{grid-column:1/-1;flex-direction:row;align-items:center;justify-content:flex-start;gap:14px;min-height:84px;background:var(--accent);border-color:transparent;color:var(--accent-ink);font-size:26px}
+.tile.wide .ico{color:var(--accent-ink);width:38px;height:38px}
+.tile.wide small{color:var(--accent-ink);opacity:.8}
+
+/* Boutons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:52px;padding:0 18px;border-radius:12px;border:1px solid var(--line);background:var(--surface-2);font-weight:600;font-size:17px;text-align:center}
+.btn.primary{background:var(--accent);border-color:transparent;color:var(--accent-ink)}
+.btn.danger{background:transparent;border-color:var(--neg);color:var(--neg)}
+.btn.danger-fill{background:var(--neg);border-color:transparent;color:var(--bg)}
+.btn.block{width:100%}
+.btn.tall{min-height:64px;font-size:19px}
+.toolbar{display:flex;gap:10px}
+.toolbar input{flex:1;min-width:0}
+.scroller{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.scroller .btn{flex:none;min-height:44px;padding:0 14px;font-size:15px}
+
+/* Listes */
+.li{display:flex;align-items:center;gap:12px;width:100%;min-height:66px;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:var(--surface);text-align:left}
+.li>.ico{color:var(--accent)}
+.li-main{display:grid;gap:2px;min-width:0;flex:1}
+.li .t{font-weight:600;font-size:18px;overflow-wrap:anywhere}
+.li .s{font-size:14px;color:var(--muted)}
+.li-side{display:flex;align-items:center;gap:8px;flex:none}
+.li .n{font:500 14px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.dotc{display:inline-grid;place-items:center;min-width:26px;height:26px;padding:0 6px;border-radius:999px;font:700 13px var(--font-mono)}
+.dotc.t-neg{background:var(--neg-bg);color:var(--neg)}
+
+/* Fiches techniques */
+.specs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--line)}
+.spec{display:grid;gap:2px;padding:10px 12px;background:var(--surface);min-width:0}
+.spec.full{grid-column:1/-1}
+.spec .k{font-size:12px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.spec .v{font:500 18px/1.3 var(--font-mono);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.spec .v.txt{font:500 17px/1.4 var(--font-body);white-space:pre-wrap}
+.spec .v.none{color:var(--muted)}
+
+/* Notes et manœuvres */
+.item{display:grid;gap:8px;padding:10px 12px 12px 14px;border-radius:14px;border:1px solid var(--line);border-left:5px solid var(--line);background:var(--surface);min-width:0}
+.item.t-neg{border-left-color:var(--neg)}
+.item.t-pos{border-left-color:var(--pos)}
+.item.t-conseil{border-left-color:var(--warn)}
+.item.t-man{border-left-color:var(--accent)}
+.item-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px;color:var(--muted);min-height:38px}
+.tag{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;font:700 12px var(--font-body);letter-spacing:.08em;text-transform:uppercase}
+.tag::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor}
+.tag.t-neg{color:var(--neg);background:var(--neg-bg)}
+.tag.t-pos{color:var(--pos);background:var(--pos-bg)}
+.tag.t-conseil{color:var(--warn);background:var(--warn-bg)}
+.tag.t-info{color:var(--muted);background:var(--surface-2)}
+.tag.t-man{color:var(--accent);background:var(--accent-bg)}
+.item-text{white-space:pre-wrap;overflow-wrap:anywhere;font-size:17px}
+.facts{display:flex;flex-wrap:wrap;gap:4px 14px;font:500 14px var(--font-mono);color:var(--muted)}
+.pn{display:grid;grid-template-columns:20px 1fr;gap:6px;white-space:pre-wrap;overflow-wrap:anywhere}
+.pn .s{font-weight:700;font-size:18px;line-height:1.3}
+.pn.pos .s{color:var(--pos)}
+.pn.neg .s{color:var(--neg)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 12px;border-radius:999px;border:0;background:var(--surface-2);font-size:14px;font-weight:600}
+.chip.static{cursor:default}
+.filters{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.fchip{flex:none;min-height:40px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:transparent;font-size:14px;font-weight:600}
+.fchip[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:transparent}
+
+/* Briefing */
+.brief{display:grid;gap:10px}
+.brief-h{display:flex;align-items:center;gap:10px;width:100%;padding:12px 14px;border-radius:14px;border:0;background:var(--surface-2);text-align:left}
+.brief-h .lbl{font:600 12px var(--font-body);letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+.brief-h .t{flex:1;min-width:0;font:700 22px/1.1 var(--font-display);overflow-wrap:anywhere}
+.brief-sum{display:flex;flex-wrap:wrap;gap:8px}
+
+/* Formulaires */
+.form{display:grid;gap:18px}
+.field{display:grid;gap:6px;min-width:0;margin:0;padding:0;border:0}
+.lbl{font:600 13px var(--font-body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.req{color:var(--accent);font-style:normal}
+.hint{font-size:13px;color:var(--muted)}
+input,select,textarea{width:100%;min-height:54px;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font:400 18px var(--font-body)}
+textarea{min-height:120px;resize:vertical;line-height:1.45}
+.field.pos textarea{border-color:var(--pos)}
+.field.neg textarea{border-color:var(--neg)}
+.field.pos .lbl{color:var(--pos)}
+.field.neg .lbl{color:var(--neg)}
+.with-unit{position:relative;display:block}
+.with-unit input{padding-right:44px;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.with-unit>span{position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--muted);font:500 16px var(--font-mono)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.seg{display:flex;flex-wrap:wrap;gap:8px}
+.seg-opt{position:relative;flex:1 1 auto}
+.seg-opt input{position:absolute;inset:0;width:100%;height:100%;min-height:0;margin:0;opacity:0}
+.seg-opt span{display:flex;align-items:center;justify-content:center;min-height:50px;padding:0 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);font-weight:600;font-size:16px;white-space:nowrap}
+.seg-opt input:checked+span{background:var(--accent);border-color:transparent;color:var(--accent-ink)}
+.seg-opt.t-neg input:checked+span{background:var(--neg-bg);border-color:var(--neg);color:var(--neg)}
+.seg-opt.t-pos input:checked+span{background:var(--pos-bg);border-color:var(--pos);color:var(--pos)}
+.seg-opt.t-conseil input:checked+span{background:var(--warn-bg);border-color:var(--warn);color:var(--warn)}
+.seg-opt.t-info input:checked+span{background:var(--surface-2);border-color:var(--fg);color:var(--fg)}
+.pick{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:54px;padding:0 12px 0 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);text-align:left;font-size:18px}
+.pick.empty .pv{color:var(--muted)}
+.pick .ico{color:var(--muted)}
+.confirm{display:grid;gap:10px;padding:14px;border-radius:14px;border:1px solid var(--neg);background:var(--neg-bg)}
+.confirm.calm{border-color:var(--accent);background:var(--accent-bg)}
+.confirm p{margin:0;font-weight:600}
+
+/* Barre d'onglets */
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;grid-template-columns:repeat(5,1fr);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));background:var(--bar);border-top:1px solid var(--bar-line)}
+.tab{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;min-height:64px;padding:5px 0 6px;border:0;background:none;color:var(--bar-muted);font-size:12px;font-weight:600;letter-spacing:.02em}
+.tab .ico{width:25px;height:25px}
+.tab[aria-current="page"]{color:var(--bar-accent)}
+.tab-home[aria-current="page"] .dot{outline:2px solid var(--bar-accent);outline-offset:1px}
+.tab-home .dot{display:grid;place-items:center;width:36px;height:36px;margin:0;border-radius:50%;background:var(--accent);color:var(--accent-ink);box-shadow:0 6px 16px var(--shadow)}
+.tab-home .dot .ico{width:22px;height:22px}
+
+/* Sélecteur plein écran */
+#sheet{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;background:var(--bg);padding-top:env(safe-area-inset-top,0px)}
+.sheet-bar{display:flex;align-items:center;gap:6px;min-height:62px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));background:var(--bar);border-bottom:1px solid var(--line)}
+.sheet-bar h2{margin:0;font:700 23px var(--font-display);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sheet-body{flex:1;overflow-y:auto;display:grid;gap:12px;align-content:start;padding-block:14px calc(24px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.create{display:grid;gap:8px}
+
+#toast{position:fixed;z-index:60;left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));bottom:calc(86px + env(safe-area-inset-bottom,0px));max-width:560px;margin:0 auto;padding:14px 16px;border-radius:14px;background:var(--fg);color:var(--bg);font-weight:600;font-size:16px;box-shadow:0 8px 24px var(--shadow)}
+@media (prefers-reduced-motion: no-preference){
+  #toast{animation:up .18s ease-out}
+  @keyframes up{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+}
+@media (min-width:600px){.tiles{grid-template-columns:repeat(3,1fr)}}
+/* v0.13 : fiche navire, DSQ, mouillages, bottin */
+.sec{margin:22px 0 2px;padding-top:12px;border-top:1px solid var(--line);font:700 19px/1.2 var(--font-display);letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+.form .sec:first-child{margin-top:0;border-top:0;padding-top:0}
+.timef{display:grid;grid-template-columns:1fr auto;gap:8px}
+.timef input{font:500 22px var(--font-mono);letter-spacing:.06em}
+.chk{display:flex;align-items:center;gap:12px;min-height:52px;padding:0 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface);font-weight:600}
+.chk input{width:24px;height:24px;accent-color:var(--accent)}
+.reg{margin:0;padding:12px 14px;border-radius:12px;border:1px dashed var(--muted);background:var(--surface-2);color:var(--muted);font-size:15px}
+.reg b{color:var(--fg)}
+.reg .src{display:block;margin-top:6px;font-size:12px;letter-spacing:.04em}
+.verdict{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:12px;font-weight:700}
+.verdict.ok{color:var(--pos);background:var(--pos-bg)}
+.verdict.bad{color:var(--neg);background:var(--neg-bg)}
+.verdict.unk{color:var(--warn);background:var(--warn-bg)}
+.verdict small{display:block;font-weight:500;color:var(--fg)}
+.st-table{display:grid;gap:8px}
+.st-row{display:grid;grid-template-columns:minmax(0,1.1fr) 92px minmax(0,1fr);gap:8px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.st-row input{width:100%;font:500 19px var(--font-mono);padding:8px;text-align:center}
+.st-row .n{font-weight:700}
+.st-row .r{font:500 14px var(--font-mono);text-align:right;line-height:1.3}
+.st-row .r b{font-size:18px}
+.depth{font:600 26px/1 var(--font-mono);color:var(--accent);white-space:nowrap}
+.depth.none{font-size:15px;color:var(--muted)}
+.ev{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:start;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.ev time{font:500 17px var(--font-mono);color:var(--accent)}
+.addrow{display:grid;grid-template-columns:96px 1fr;gap:8px}
+.addrow input{min-width:0}
+a.tel{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border-radius:999px;background:var(--pos-bg);color:var(--pos);font-weight:700;text-decoration:none}
+.code{font:600 14px var(--font-mono);padding:2px 8px;border-radius:6px;background:var(--surface-2);color:var(--accent)}
+/* v0.14 : fiche « rapport », états, heures aux points */
+.rpt{display:grid;gap:2px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.rpt h3{margin:0 0 4px;font:700 14px var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.kv{display:flex;flex-wrap:wrap;gap:2px 14px;font-size:15px;line-height:1.5}
+.kv span{white-space:nowrap}
+.kv i{font-style:normal;color:var(--muted);font-size:13px;margin-right:3px}
+.kv b{font:600 16px var(--font-mono)}
+.kv .wrap{white-space:normal}
+.state{display:grid;gap:10px;padding:14px;border-radius:16px;border:2px solid var(--accent);background:var(--accent-bg)}
+.state .lbl{color:var(--accent)}
+.state .t{font:700 26px/1.1 var(--font-display)}
+.pts{display:grid;gap:6px}
+.pt{display:grid;grid-template-columns:minmax(0,1fr) 64px 76px 84px;gap:6px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.pt .n{font-weight:700;line-height:1.15}
+.pt .n small{display:block;font-weight:500;font-size:12px;color:var(--muted)}
+.pt input{min-height:44px;padding:6px;font:500 17px var(--font-mono);text-align:center}
+.pt .eta{font:600 22px var(--font-mono);text-align:center}
+.pt .eta.real{color:var(--pos)}
+.pt .btn{min-height:44px;padding:0 8px;font-size:14px}
+.pt.hd{background:none;border:0;padding:0 10px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.call{display:grid;gap:10px}
+.call .l{display:grid;grid-template-columns:120px 1fr;gap:10px;align-items:baseline;padding:10px 0;border-bottom:1px solid var(--line)}
+.call .l span{color:var(--muted);font-size:14px;text-transform:uppercase;letter-spacing:.08em}
+.call .l b{font:600 26px/1.2 var(--font-mono);overflow-wrap:anywhere}
+.call .l b.txt{font:700 26px/1.2 var(--font-display)}
+.photos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.photos button{padding:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;aspect-ratio:1;background:var(--surface-2)}
+.photos img{width:100%;height:100%;object-fit:cover;display:block}
+.lchip{display:inline-flex;align-items:center;gap:4px;min-height:40px;padding:0 6px 0 12px;border-radius:999px;background:var(--surface-2);font-size:15px;font-weight:600}
+.lchip button{width:32px;height:32px;border:0;border-radius:50%;background:transparent;color:var(--neg)}
+.grp{margin:12px 0 0;font:700 16px var(--font-display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.dsqbox{position:sticky;top:54px;z-index:5;display:grid;gap:8px;padding:12px;border-radius:14px;border:2px solid var(--accent);background:var(--surface);box-shadow:0 6px 16px var(--shadow)}
+.dsqbox b{font-size:17px}
+a.btn{text-decoration:none;color:inherit}
+.li.okd{border-color:var(--pos)}
+.li.bad{border-color:var(--neg);opacity:.75}
+.mk{font-weight:700;font-size:20px}
+.li.okd .mk{color:var(--pos)}
+.li.bad .mk{color:var(--neg)}
+/* v0.15 : accueil */
+:root{--brand-pro:#FFFFFF;--brand-pilot:#FF4F43}
+:root[data-theme="nuit"],:root[data-theme="dark"]{--brand-pro:#FF3B2F;--brand-pilot:#A81E14}
+.bar.is-home{display:grid;grid-template-columns:1fr auto 1fr}
+.bar.is-home #barAct{display:none}
+.bar.is-home #clock{justify-self:end}
+.brand-btn{display:inline-flex;min-height:42px;align-items:center;padding:0;border:0;background:none;font:800 23px/1 var(--font-display);letter-spacing:.01em}
+.brand-btn .p{color:var(--brand-pro)}
+.brand-btn .q{color:var(--brand-pilot)}
+:root[data-theme="blanc"] .brand-btn{min-height:32px;padding:0 8px;border-radius:7px;background:#0B2E4F}
+main.home{height:calc(100dvh - 47px - 64px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));padding-block:10px;grid-template-rows:auto minmax(0,1fr);gap:10px;align-content:stretch}
+main.home .searchbtn{min-height:44px;border-radius:12px}
+.hgrid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(3,minmax(0,1fr));gap:10px;min-height:0}
+.hbtn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-width:0;min-height:0;padding:8px;border-radius:16px;border:1px solid var(--line);background:var(--surface);color:var(--fg);text-align:center;text-decoration:none;overflow:hidden;font:700 22px/1.08 var(--font-display)}
+.hbtn .ico{flex:none;width:34px;height:34px;color:var(--accent)}
+.hbtn small{display:block;max-width:100%;font:500 13px/1.25 var(--font-body);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hbtn .nm{display:block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:20px}
+.hbtn.prep{border:2px solid var(--warn);background:var(--warn-bg)}
+.hbtn.prep .ico{color:var(--warn)}
+.hbtn.live{border:2px solid var(--accent);background:var(--accent);color:var(--accent-ink)}
+.hbtn.live .ico,.hbtn.live small{color:var(--accent-ink)}
+@media (prefers-reduced-motion: no-preference){
+  .hbtn.live{animation:pulse 2.8s ease-in-out infinite}
+  :root[data-theme="nuit"][data-pulse="off"] .hbtn.live{animation:none}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.68}}
+}
+a.li{text-decoration:none;color:inherit}
+.favb{flex:none;width:44px;height:44px;border:0;border-radius:50%;background:none;color:var(--muted)}
+.favb[aria-pressed="true"]{color:var(--neg)}
+.favb[aria-pressed="true"] svg{fill:currentColor}
+</style>
+</head>
+<body>
+<header class="hdr">
+  <div class="bar">
+    <button class="icon-btn" id="btnBack" aria-label="Retour" hidden></button>
+    <h1 id="title">ProPilot</h1>
+    <span id="cnt"></span>
+    <div id="barAct"></div>
+    <time id="clock"></time>
+  </div>
+</header>
+<main id="main"></main>
+<nav class="tabs" id="tabs" aria-label="Navigation principale"></nav>
+<div id="sheet" role="dialog" aria-modal="true" hidden></div>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+<script>
+(() => {
+'use strict';
+const VERSION = 'v0.15.1 · prête pour le site ProPilot (22 nov. 2026)';
+const PWA = !!window.MPP_PWA;
+
+/* ---------- Utilitaires ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const pad = n => String(n).padStart(2, '0');
+const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+const nowLocal = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const curYear = () => String(new Date().getFullYear());
+const MOIS = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+function fmtDate(s, time) {
+  if (!s) return '—';
+  const [d, t] = s.split('T'); const [y, m, j] = d.split('-');
+  let r = `${+j} ${MOIS[+m-1]} ${y}`;
+  if (time && t) r += ` · ${t.slice(0,2)} h ${t.slice(3,5)}`;
+  return r;
+}
+const parseNum = v => { v = String(v ?? '').replace(/\s/g, '').replace(',', '.'); if (!v) return null; const n = Number(v); return Number.isFinite(n) ? n : NaN; };
+const fmtNum = n => (n == null || n === '' || Number.isNaN(n)) ? '' : Number(n).toLocaleString('fr-CA', {maximumFractionDigits: 2});
+const pl = (n, one, many) => `${n} ${n > 1 ? many : one}`;
+const fmtM = n => n == null ? '' : fmtNum(n) + ' m';
+const byDateDesc = (a, b) => (b.date||'').localeCompare(a.date||'') || (b.cree||'').localeCompare(a.cree||'');
+const byName = (a, b) => (a.nom||'').localeCompare(b.nom||'', 'fr', {sensitivity:'base'});
+
+/* ---------- Icônes ---------- */
+const ICON = {
+  back:'<path d="M15 5l-7 7 7 7"/>', chev:'<path d="M9 6l6 6-6 6"/>', close:'<path d="M6 6l12 12M18 6L6 18"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>', check:'<path d="M5 12.5l4.5 4.5L19 7"/>', edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
+  phone:'<path d="M6 3.5h3l1.5 4.5-2 1.5a12 12 0 0 0 6 6l1.5-2 4.5 1.5v3a2 2 0 0 1-2.2 2A17 17 0 0 1 4 5.7a2 2 0 0 1 2-2.2z"/>',
+  lock:'<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',
+  apps:'<rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/>',
+  globe:'<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.4 3.7 5.2 3.7 8.5s-1.2 6.1-3.7 8.5c-2.5-2.4-3.7-5.2-3.7-8.5s1.2-6.1 3.7-8.5z"/>',
+  net:'<path d="M14 4.5h5.5V10"/><path d="M19.5 4.5L11 13"/><path d="M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.500 6H10"/>',
+  book:'<path d="M5 4.5h12a2 2 0 0 1 2 2v13H7a2 2 0 0 1-2-2z"/><path d="M5 17.500a2 2 0 0 1 2-2h12"/><path d="M9 8.500h6"/>',
+  heart:'<path d="M12 20s-7.500-4.600-8.500-9.500A4.700 4.700 0 0 1 12 7a4.700 4.700 0 0 1 8.500 3.500C19.500 15.400 12 20 12 20z"/>',
+  taxi:'<path d="M4 16v-3.500l2-5h12l2 5V16"/><path d="M3.500 12.500h17M9.500 7.500V5h5v2.500"/><path d="M3.500 16h17v3h-3v-1.500h-11V19h-3z"/>',
+  search:'<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>', home:'<path d="M4 11l8-6.5 8 6.5"/><path d="M6 9.5V20h12V9.5"/>',
+  ship:'<path d="M3 14.5h18l-2.5 5h-13z"/><path d="M6 14.5V9.5h12v5"/><path d="M9.5 9.5V5.5h5v4"/>',
+  quai:'<path d="M3 9h18"/><path d="M6 9v7M12 9v7M18 9v7"/><path d="M3 19.5c1.5-1 3-1 4.5 0s3 1 4.5 0 3-1 4.5 0 3 1 4.5 0"/>',
+  ancre:'<circle cx="12" cy="5" r="2"/><path d="M12 7v14M8.5 11h7"/><path d="M4.5 14a7.5 7.5 0 0 0 15 0"/>',
+  tug:'<path d="M2.5 15h19l-2.5 4.5H5z"/><path d="M6 15v-3.5h8V15"/><path d="M9 11.5V8h3.5v3.5"/><path d="M15.5 15l3.5-6"/>',
+  pin:'<path d="M12 21s6.5-5.8 6.5-11.2a6.5 6.5 0 0 0-13 0C5.5 15.2 12 21 12 21z"/><circle cx="12" cy="9.8" r="2.3"/>',
+  note:'<path d="M6 3.5h8.5L18.5 7.5V20.5H6z"/><path d="M12 10.5v6M9 13.5h6"/>',
+  clip:'<rect x="5" y="4.5" width="14" height="16" rx="2"/><path d="M9 4.5V3h6v1.5M8.5 10h7M8.5 13.5h7M8.5 17h4"/>',
+  count:'<path d="M4 20V11M9.5 20V5M15 20v-6M20.5 20V8"/>',
+  gear:'<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>',
+  eye:'<path d="M2 12s3.8-6.5 10-6.5S22 12 22 12s-3.8 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/>',
+  bridge:'<path d="M2 17h20"/><path d="M3 17c2.5-7 15.5-7 18 0"/><path d="M7.5 17v-4M12 17v-5.5M16.5 17v-4"/>',
+  wheel:'<circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="1.8"/><path d="M12 2.5v7.7M12 13.8v7.7M2.5 12h7.7M13.8 12h7.7"/>'
+};
+const ic = (n, cls = '') => `<svg class="ico ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n] || ''}</svg>`;
+
+/* ---------- Vocabulaire ---------- */
+const TON = {neg:'Négatif', conseil:'Conseil', pos:'Positif', info:'Info'};
+const SRC = {moi:'Moi', collegue:'Collègue', remorqueur:'Remorqueur', equipage:'Équipage', autre:'Autre'};
+const CAT = {quai:'Quai / section', ancrage:'Ancrage', remorqueur:'Remorqueur', lieu:'Autre lieu'};
+const CAT_PL = {quai:'Quais & sections', ancrage:'Ancrages', remorqueur:'Remorqueurs', lieu:'Autres lieux'};
+const CAT_IC = {quai:'quai', ancrage:'ancre', remorqueur:'tug', lieu:'pin'};
+const MTYPE = {accostage:'Accostage', appareillage:'Appareillage', mouillage:'Mouillage', autre:'Autre'};
+const COTE = {bd:'Bâbord à quai', td:'Tribord à quai'};
+const BT = {bon:'BT efficace', moyen:'BT moyen', faible:'BT faible', non:'BT non utilisé'};
+const NTYPES = ['Porte-conteneurs','Vraquier','Pétrolier / chimiquier','Cargo général','Roulier','Paquebot','Autre'];
+
+/* ---------- Référentiels v0.13 ---------- */
+// Tableaux DSQ requis (m) selon largeur (m) et vitesse sur l'eau 7 à 15 nœuds.
+// Source : dsq table.docx du pilote, repris des tableaux de Pêches et Océans (en vigueur 2013-04-01, Avis 27C). À vérifier contre l'officiel.
+const DSQ_V = [7,8,9,10,11,12,13,14,15];
+const DSQ_T = {
+  pc:{24:[0.79,0.88,0.96,1.04,1.22,1.41,1.63,1.88,2.17],26:[0.83,0.9,0.98,1.07,1.25,1.45,1.68,1.93,2.23],28:[0.84,0.91,1.0,1.09,1.28,1.48,1.72,1.98,2.29],30:[0.86,0.93,1.01,1.11,1.31,1.52,1.76,2.03,2.34],32:[0.87,0.94,1.03,1.14,1.34,1.55,1.8,2.08,2.4],34:[0.88,0.96,1.05,1.16,1.36,1.58,1.84,2.12,2.45],36:[0.89,0.97,1.07,1.18,1.39,1.62,1.88,2.16,2.5],38:[0.9,0.98,1.08,1.2,1.42,1.65,1.92,2.2,2.55],40:[0.91,1.0,1.1,1.22,1.44,1.68,1.96,2.24,2.6],42:[0.92,1.01,1.12,1.24,1.47,1.71,1.99,2.29,2.65],44:[0.93,1.02,1.13,1.26,1.49,1.74,2.03,2.33,2.7]},
+  au:{24:[0.8,0.9,0.97,1.06,1.24,1.44,1.66,1.92,2.21],26:[0.85,0.92,1.0,1.09,1.29,1.49,1.73,1.99,2.29],28:[0.86,0.94,1.03,1.13,1.33,1.54,1.79,2.06,2.37],30:[0.88,0.96,1.05,1.16,1.37,1.59,1.85,2.13,2.46],32:[0.89,0.98,1.08,1.19,1.41,1.64,1.91,2.19,2.53],34:[0.91,1.0,1.1,1.23,1.45,1.69,1.97,2.26,2.61],36:[0.93,1.02,1.13,1.26,1.49,1.74,2.02,2.32,2.69],38:[0.94,1.04,1.16,1.29,1.53,1.78,2.08,2.39,2.77],40:[0.96,1.06,1.18,1.32,1.57,1.83,2.13,2.44,2.84],42:[0.97,1.08,1.21,1.36,1.61,1.88,2.18,2.51,2.91],44:[0.99,1.1,1.23,1.39,1.65,1.93,2.24,2.57,2.98]}
+};
+// Vitesse sur l'eau permise : ligne de largeur supérieure (prudent), pas d'interpolation.
+function vitessePermise(type, largeur, dsq) {
+  if (largeur == null || dsq == null || Number.isNaN(largeur) || Number.isNaN(dsq)) return {msg:'Largeur ou DSQ manquante'};
+  if (largeur > 44) return {msg:'Largeur > 44 m : hors du tableau'};
+  const row = Math.max(24, Math.ceil(largeur / 2) * 2), req = DSQ_T[type][row];
+  let v = null; DSQ_V.forEach((s, i) => { if (req[i] <= dsq) v = s; });
+  return {v, row, req7:req[0], msg: v == null ? `Sous le minimum du tableau (${fmtNum(req[0])} m requis à 7 nœuds)` : ''};
+}
+const STATIONS = [['TRV','Trois-Rivières'],['LSP','Lac Saint-Pierre'],['SOR','Sorel'],['CONQ','Contrecœur'],['VAR','Varennes'],['MTL','Montréal']];
+const CHENAL = 11.3; // profondeur minimale du chenal jusqu'à M177 (Port de Montréal, P&P 2025-06-20, 2.1.1)
+const REG_SRC = 'Port de Montréal — Pratiques et procédures, éd. 2025-06-20, section 2.1.1';
+const firstNum = s => { const m = String(s ?? '').replace(',', '.').match(/-?\d+(\.\d+)?/); return m ? Number(m[0]) : null; };
+const PILOTES = /*PILOTES*/[];
+const TELS = /*TELS*/{};
+const INJECTE = PILOTES.length > 0;
+
+/* ---------- Référentiels v0.14 ---------- */
+const GOUV_DEF = ['Becker','Schilling','Régulier 30°','Régulier 40°','Régulier 70°','Autre'];
+const REGIONS = ['Montréal','Sorel-Tracy','Trois-Rivières','Voie maritime','Autres'];
+const isTanker = t => /p[ée]trol|tanker|chimiq/i.test(t || '');
+const isPC = t => /conteneur/i.test(t || '');
+function regionOf(l) {
+  if (!l) return '';
+  if (l.region) return l.region;
+  const t = norm((l.nom || '') + ' ' + (l.secteur || ''));
+  if (/lambert|ecluse|voie maritime|seaway/.test(t)) return 'Voie maritime';
+  if (/sorel|tracy|kildair|qit/.test(t)) return 'Sorel-Tracy';
+  if (/trois|trv|becancour|pointe-des-ormes|pdo/.test(t)) return 'Trois-Rivières';
+  if (/montr|section|contrec|pat|pointe-aux|suncor|valero|shell|norcan|viau|^b-|12-nord/.test(t)) return 'Montréal';
+  return 'Autres';
+}
+// Mouillages regroupés (demande du pilote, 20 nov.)
+const MGROUPES = ['Port de Montréal','Lanoraie','Sorel-Tracy','Lac Saint-Pierre','Trois-Rivières','Autres'];
+function groupeMouillage(l) {
+  const s = norm(l.secteur);
+  if (/montreal|pointe-aux-trembles|longue-pointe|cap-saint-michel|contrec/.test(s)) return 'Port de Montréal';
+  if (/lanoraie|raisins/.test(s)) return 'Lanoraie';
+  if (/tracy|sorel/.test(s)) return 'Sorel-Tracy';
+  if (/lac saint-pierre|yamachiche/.test(s)) return 'Lac Saint-Pierre';
+  if (/pointe-des-ormes|trois-rivieres/.test(s)) return 'Trois-Rivières';
+  return 'Autres';
+}
+const DSQ_MOU_SRC = 'Pilotage.pdf (OneNote du pilote), p. 55 — page « DSQ » des ancrages (21 juin 2022)';
+const profRequise = (te, tanker) => r2(tanker ? te * 1.1 : te + 0.9);
+// Navette : numéro du Bottin 2026 (à vérifier). Utilisé quand la fiche du quai n'en a pas.
+const NAVETTE_DEF = {nom:'Centre d\'affectation et navette Ville-Marie', tel:TELS.navette || '', src:'Bottin 2026 (CPSLC) et précision du pilote, 22 nov. 2026'};
+const telHref = t => { const m = String(t || '').match(/^(.*?)[,\s]*(?:poste|p\.)\s*(\d+)/i); return 'tel:' + (m ? m[1].replace(/\D/g, '') + ',' + m[2] : String(t || '').replace(/\D/g, '')); };
+const PERSO_H = 3133650533;
+const hashCode = t => { let h = 2166136261; for (const b of new TextEncoder().encode(t)) { h ^= b; h = Math.imul(h, 16777619); } return h >>> 0; };
+let persoUntil = 0;
+const persoOk = () => Date.now() < persoUntil;
+const APPS = [{nom:'iSailor'}, {nom:'MarineTraffic', url:'https://www.marinetraffic.com/'}, {nom:'NAUTILO'}, {nom:'Windy', url:'https://www.windy.com/'}];
+const NETPILOT = 'https://efiche.live.pilotagestlaurent.gc.ca/Login.aspx';
+// Points d'appel et distances (NM). Source : fichier_navigation.xlsx du pilote + précisions du 19 nov. Tracy → point 2 : distances données par le pilote le 22 nov. 2026.
+const POINTS = [['PDO','Pointe-des-Ormes'],['YAM','Yamachiche'],['IDB','Île-des-Barques'],['TRACY','Tracy'],['CONQ','Contrecœur'],['CSM','Cap-Saint-Michel'],['110','Section 110'],['CIP2','C.I.P. 2 (point 2)'],['ECL','Écluse Saint-Lambert']];
+const SEG = {'PDO-YAM':11.5,'YAM-IDB':11.5,'IDB-TRACY':8.85,'TRACY-CONQ':12,'CONQ-CSM':9,'CSM-110':6.3,'110-CIP2':6.7,'CIP2-ECL':2.0};
+const SEG_DOUTE = [];
+const ptName = c => (POINTS.find(p => p[0] === c) || [c, c])[1];
+const segKey = (a, b) => SEG[a + '-' + b] != null ? a + '-' + b : b + '-' + a;
+// Dégagements aériens. Source : ATL 112 (éd. 2025-05), tableau récapitulatif des obstacles aériens, annexe A-16 (p. 94 du PDF) ; Richelieu : p. 38.
+// zc = hauteur de la référence au-dessus du zéro des cartes (PMSGM à Trois-Rivières : 3,1 m). Sans zc : hauteur rapportée au zéro des cartes.
+// si = obstacle affiché sur la fiche seulement pour ce trajet. gl = sous verglas.
+const ATL = 'ATL 112 (éd. 2025-05)';
+const MARGE_MIN = 1; // Marge minimale demandée par le pilote (22 nov. 2026)
+const DEGAG = [
+  {nom:'Câble, Trois-Rivières-Ouest', hl:50, gl:37, zc:3.1, ref:'PMSGM', st:'TRV', p:94},
+  {nom:'Pont Laviolette (limites du chenal)', hl:48, zc:3.1, ref:'PMSGM', rem:'49 m au centre du chenal, 225 m de large', st:'TRV', p:94},
+  {nom:'Câble, Sorel-Tracy – Lanoraie', hl:52, gl:44, st:'SOR', p:94},
+  {nom:'Câble, Pointe-aux-Trembles Nord', hl:55, gl:31, st:'VAR', p:94},
+  {nom:'Câble, Pointe-aux-Trembles Sud', hl:50, gl:42, st:'VAR', p:94},
+  {nom:'Câble, Longue-Pointe – île Charron', hl:52, rem:'verglas : voir le diagramme en annexe', st:'MTL', p:94},
+  {nom:'Pont Jacques-Cartier, accosté au quai', hl:49, st:'MTL', p:94},
+  {nom:'Pont Jacques-Cartier, chenal principal', hl:51, rem:'au centre du chenal, sur 122 m de large', st:'MTL', p:94},
+  {nom:'Pont Jacques-Cartier, Voie maritime', hl:43, st:'MTL', p:94, si:'lambert'},
+  {nom:'Câble HT, rivière Richelieu', hl:40, rem:'au nord du pont ferroviaire sectionné', st:'SOR', p:38, si:'richelieu'}
+];
+const tMin = h => { if (!h) return null; const [a, b] = h.split(':'); return +a * 60 + +b; };
+const tFmt = m => { if (m == null) return ''; m = ((Math.round(m) % 1440) + 1440) % 1440; return `${pad(Math.floor(m / 60))}:${pad(m % 60)}`; };
+const dureeFmt = m => m == null ? '' : `${Math.floor(m / 60)} h ${pad(m % 60)}`;
+function tempsTrajet(a) { const d = tMin(a.hDepart), f = tMin(a.hDebarque); return d == null || f == null ? null : ((f - d) + 1440) % 1440; }
+
+/* ---------- Données (sur l'appareil; Firebase à brancher) ---------- */
+const KEY = 'marinePilotPro.v1', BACKUP_KEY = 'marinePilotPro.copieSecours';
+const DB = {
+  d: null,
+  empty() { return {schema:1, navires:[], lieux:[], notes:[], affectations:[], stretches:[], perso:{man:[], tug:[]}, reglages:{theme:'auto', jour:'marin', pulseNuit:'on', anneeDepart:{}, listes:{}, favoris:[], sites:[]}}; },
+  load() {
+    let raw = null;
+    try { raw = localStorage.getItem(KEY); } catch (e) {}
+    if (raw) { try { this.d = JSON.parse(raw); } catch (e) { this.d = null; } }
+    if (!this.d) { this.d = this.empty(); seed(this.d); this.save(true); }
+    this.norm();
+  },
+  norm() {
+    const e = this.empty();
+    for (const k in e) if (this.d[k] == null) this.d[k] = e[k];
+    this.d.reglages = Object.assign(e.reglages, this.d.reglages || {});
+    if (!this.d.reglages.anneeDepart) this.d.reglages.anneeDepart = {};
+    if (!(this.d.seedV >= 2)) {
+      seedV2(this.d);
+      // v0.13 : chaque fiche est rattachée à un stretch (transférable), plus de nombre de départ
+      for (const a of this.d.affectations) if (!a.stretchId) { const s = stretchOfIn(this.d, a.date); if (s) a.stretchId = s.id; }
+      this.d.seedV = 2; this.save(true);
+    }
+    const L = this.d.reglages.listes = this.d.reglages.listes || {};
+    if (!L.gouvernail) L.gouvernail = [...GOUV_DEF];
+    if (!L.type) L.type = [...NTYPES];
+    if (!L.cargo) L.cargo = [];
+    if (!(this.d.seedV >= 3)) {
+      seedV3(this.d);
+      for (const a of this.d.affectations) {
+        if (!a.statut) a.statut = 'fini';
+        if (a.destMode === 'mer') { a.destAutre = true; }
+      }
+      this.d.seedV = 3; this.save(true);
+    }
+  },
+  save(quiet) {
+    try { localStorage.setItem(KEY, JSON.stringify(this.d)); return true; }
+    catch (e) { if (!quiet) toast("Enregistrement impossible sur cet appareil. Exportez une sauvegarde."); return false; }
+  },
+  list(c) { return this.d[c]; },
+  get(c, id) { return id ? this.d[c].find(x => x.id === id) : null; },
+  put(c, o) {
+    o = {...o}; o.maj = nowLocal();
+    if (!o.id) { o.id = uid(); o.cree = o.maj; this.d[c].push(o); }
+    else { const i = this.d[c].findIndex(x => x.id === o.id); if (i < 0) this.d[c].push(o); else this.d[c][i] = o; }
+    this.save(); return o;
+  },
+  del(c, id) { this.d[c] = this.d[c].filter(x => x.id !== id); this.save(); }
+};
+function seed(d) {
+  const t = nowLocal(), a = uid(), s = uid();
+  d.navires.push({id:a, nom:'Algoma Bear', cree:t, maj:t});
+  d.lieux.push({id:s, cat:'quai', nom:'Section 36', cree:t, maj:t});
+  d.notes.push({id:uid(), kind:'note', ton:'neg', texte:'Navire peu manœuvrable.', navireId:a, lieuId:null, source:'collegue', sourceNom:'', date:t, cree:t, maj:t});
+  d.notes.push({id:uid(), kind:'note', ton:'conseil', texte:'Le courant remonte : prévoir un remorqueur.', navireId:null, lieuId:s, source:'collegue', sourceNom:'', date:t, cree:t, maj:t});
+}
+// Données tirées de l'export OneNote du pilote (Pilotage.pdf) et des notes de mouillage (Dominic, 2016-2017).
+const SRC_ON = 'OneNote du pilote', SRC_MOU = 'OneNote — tableau des ancrages (21 juin 2022)', SRC_DOM = 'Notes de mouillage de Dominic (2016-2017)';
+const MOUILLAGES = [
+  // [nom, secteur, profondeur, dimensions, durée pétrolier / autres, restrictions, fond, remarque, source]
+  ['Vickers amont','Port de Montréal',9.1,'','48 h / 72 h','L 270 m · B 32,5 m','','',SRC_MOU],
+  ['Vickers aval','Port de Montréal',9.1,'','48 h / 72 h','L 270 m · B 32,5 m','','',SRC_MOU],
+  ['Montréal-Est','Port de Montréal',9.1,'650 × 180 m','72 h / 120 h','L 150 m · B 32,5 m','','Face aux quais 95-96-97, côté sud de M163-M161',SRC_MOU],
+  ['PAT 1','Pointe-aux-Trembles',11.3,'225 m de large','72 h / 120 h','L 270 m · B 32,5 m','Argile','2,5 encablures de jeu entre les positions',SRC_MOU],
+  ['PAT 2','Pointe-aux-Trembles',11.0,'225 m de large','72 h / 120 h','L 270 m · B 32,5 m','Argile','',SRC_MOU],
+  ['PAT 3','Pointe-aux-Trembles',11.0,'225 m de large','72 h / 120 h','L 270 m · B 32,5 m','Argile','',SRC_MOU],
+  ['PAT 4','Pointe-aux-Trembles',11.3,'225 m de large','72 h / 120 h','L 270 m · B 32,5 m','Argile','',SRC_MOU],
+  ['Parc Bellerive (urgence)','Longue-Pointe',10,'900 × 60 m','','Petit navire (125 m)','Galets','URGENCE — en haut de M166',SRC_DOM],
+  ["Trou d'Irving (urgence)",'Cap-Saint-Michel',10.7,'500 × 50 m','','','Argile et pierre','URGENCE — en haut du CSM au sud',SRC_DOM],
+  ['Contrecœur (mouillage)','Contrecœur',10.8,'800 × 300 m','Illimité','APM','','Urgence et temporaire. Autres zones : 8,4 m (775 × 115 m, en amont de M77) et 8,0 m',SRC_DOM],
+  ['LANO A','Lanoraie',9.7,'1830 × 150 m','Illimité','L 270 m · B 32,5 m · FG oui','Argile','Vulnérable aux gros pans de glace',SRC_MOU],
+  ['LANO B','Lanoraie',10.7,'1040 × 140 m','Illimité','L 270 m · B 32,5 m · FG oui','Argile','Vulnérable aux gros pans de glace',SRC_MOU],
+  ['LANO C','Lanoraie',10.0,'800 × 125 m','Illimité','L 270 m · B 32,5 m','Argile, roche','Vulnérable aux gros pans de glace',SRC_MOU],
+  ['LANO D','Lanoraie',10.7,'660 × 150 m','Illimité','L 270 m · B 32,5 m','Sable','Vulnérable aux gros pans de glace',SRC_MOU],
+  ['LANO E','Lanoraie',9.9,'670 × 85 m','Illimité','L 270 m · B 32,5 m','Boue','',SRC_MOU],
+  ['L-1','Lanoraie / Tracy',10.4,'463 × 300 m','24 h','Tous · B 44 m','Roche, boue','Si pas de navire au quai ou attendu',SRC_MOU],
+  ['L-2','Lanoraie / Tracy',11.3,'463 × 300 m','Illimité (FG 24 h)','Tous · B 44 m','','',SRC_MOU],
+  ['L-3','Lanoraie / Tracy',11.3,'463 × 300 m','72 h (FG 24 h)','Tous · B 44 m','','',SRC_MOU],
+  ['L-4','Lanoraie / Tracy',10.7,'463 × 300 m','48 h (FG 24 h)','Tous · B 44 m','','',SRC_MOU],
+  ['L-5','Lanoraie / Tracy',10.0,'463 × 300 m','Illimité','L 230 m · B 32,5 m','','',SRC_MOU],
+  ['L-6 (urgence)','Lanoraie / Tracy',7.9,'463 × 300 m','Illimité','L 230 m · B 32,5 m','','URGENCE',SRC_MOU],
+  ['L-7 (urgence)','Lanoraie / Tracy',8.6,'463 × 300 m','Illimité','L 230 m · B 32,5 m','','URGENCE',SRC_MOU],
+  ['L-8','Lanoraie / Tracy',8.3,'463 × 300 m','Illimité','L 230 m · B 32,5 m','','',SRC_MOU],
+  ['L-9','Lanoraie / Tracy',8.3,'463 × 300 m','Illimité','L 230 m · B 32,5 m','','',SRC_MOU],
+  ['T-1','Tracy',9.1,'400 × 120 m','Illimité','L 230 m · B 32,5 m','','',SRC_MOU],
+  ...['T-2','T-3','T-4','P-1','S-1','S-2','S-3','S-4','S-5','S-6'].map(n => [n, n[0] === 'S' ? 'Sorel' : 'Tracy', null,'','Illimité','L 230 m · B 32,5 m','','Profondeur à compléter',SRC_MOU]),
+  ['Trou de Lapierre','Lanoraie',12.1,'1 mille × 150 m','','','Sable','Limite nord : tour de Lanoraie avec le sud de l\'île Lapierre',SRC_DOM],
+  ['Trou des Raisins Nord','Île aux Raisins',11,'700 × 150 m','','','Sable et boue','',SRC_DOM],
+  ['Trou des Raisins Sud','Île aux Raisins',null,'','','','','Profondeur à compléter',SRC_MOU],
+  ['Trou des Roses (urgence)','Lac Saint-Pierre',10,'1200 × 300 m','','','','URGENCE — 8 m en haut de C41',SRC_DOM],
+  ['Yamachiche','Yamachiche',10.7,'650 m (10,7 m)','','','Sable','Grande lumière de Yamachiche avec îlot B fait l\'ancrage',SRC_DOM],
+  ['Île aux Sternes','Trois-Rivières',null,'','','Tous · B 32,5 m','','Profondeur à compléter',SRC_MOU],
+  ...[1,2,3,4,5,6].map(i => [`PDO ${i}`,'Pointe-des-Ormes',null,'2,5 NM × 700 m (aire)','Illimité', i <= 3 ? 'Tous · B 44 m (FG 24 h)' : (i === 4 ? 'L 270 m · B 32,5 m' : 'Tous · B 32,5 m'),'Argile','Profondeur de l\'aire : 12 à 17 m (bassin de virage 10,5 m). Officiel en été, interdit en hiver. Ne jamais mouiller en bas du quai de PDO au sud ni en face du quai au nord. APTR',SRC_MOU]),
+  ...[1,2,3,4,5].map(i => [`TRV ${i}`,'Trois-Rivières',null,'', 'Illimité', (i === 1 || i === 4) ? 'Tous · B 44 m (FG 24 h)' : 'Tous · B 32,5 m','Sable','Aire de Trois-Rivières : 10,7 m (notes de Dominic). Urgence en été, officiel en hiver',SRC_MOU])
+];
+const NOTES_ON = [
+  // [navire ou lieu, cat ('navire' | 'quai' | 'remorqueur'), ton, texte, date, sourceNom]
+  ['Peyton Lynn C','navire','conseil','1- Gangway dans la fesse : ne pas utiliser. 2- Ne peut pas faire le mur à St-Lambert. 3- Bow et stern thruster.','2022-06-06T17:49',''],
+  ['Nacc Argonaut','navire','info','Can steer on ranges.','2022-10-05T16:23',''],
+  ['Blacky','navire','conseil','Dès que tu coupes l\'engin, on perd la gouverne. Ne perd pas sa vitesse : perdre la vitesse avant de s\'envoyer au point 2. Faire moins de 4 kts à la pancarte. Il réduit mal. Thruster 1 200 hp, OK puissance. Dead slow de 4 kts.','2024-03-29T15:35',''],
+  ['Florence Spirit','navire','conseil','Sortir de l\'écluse : roue 5° à gauche et garder le navire collé proche du mur.','2024-04-05T01:38',''],
+  ['Connaigra','navire','info','30 % juste avant l\'horloge · 40 % sous le pont · 70 % sur le lac (15 kts) · 60 % Lanoraie. Linesmen : 30 min de l\'horloge.','2024-12-28T02:42',''],
+  ['Polsteam Wigry','navire','conseil','Attention : gouvernail pas très efficace à slow et dead slow, peut-être 20°.','2026-04-27T14:14',''],
+  ['Pointe-aux-Trembles (102 @ PAT)','quai','info','Federal Sky 10,3 m, vent léger (Giroux) : en descendant, tourne à la 100 avec 2 tugs. C2 (Hamel) : 1 tug, tourne bas de MTL-Est, navires dans 2 et 3. Energy Patriot C2 : 2 tugs.','2021-05-23T19:28','Giroux, Hamel'],
+  ['Section 42','quai','info','Arrivée B1, 8,0 m (JRT) : 2 tugs.','2021-05-23T20:36','JRT'],
+  ['Section 54','quai','info','Arrivée C2 : 2 tugs (Evil). Arrivée Morning Orchid : 2 tugs (Énergie).','2022-06-04T14:15',''],
+  ['Section 58','quai','info','Arrivée CLI Pride : 1 tug arrière. CLI Pride, TE 6,0 (JCG) : 1 tug.','2022-06-21T11:56','JCG'],
+  ['Section 66','quai','info','Arrivée MSC Porto, 10,6 m (COR) : 1 tug arrière. Arrivée MSC Natra : 2 tugs. Arrivée MSC Don Giovanni, 9 m : 2 tugs, 1 navire arrière à la 67. Départ MSC Clarita, 9,8 m : 2 tugs.','2024-11-24T12:18','COR'],
+  ['Section 106','quai','info','Arrivée B1 (COR) : 2 tugs.','2024-11-24T12:19','COR'],
+  ['Sorel 15','quai','info','Avant : Comeau. Arrière : Jeansone.','2021-05-23T20:34',''],
+  ['QIT (conventionnel)','quai','info','Départ C2 : Duga à l\'avant et Bravo à l\'arrière.','2022-08-04T10:22',''],
+  ['Contrecœur','quai','info','Federal Sakura : arrivée et départ sans tugs, par faible vent. Thruster 870 hp.','2024-04-02T20:34',''],
+  ['Kildair (Tracy)','quai','info','Arrivée Starlight. Départ MSC Natra : 2 tugs. Starlight : 2 tugs, départ Tracy (ARAM), venteux.','2024-11-24T12:23','ARAM'],
+  ['Bravo','remorqueur','info','Bravo tire 50 T et se tient bien dans le courant.','2022-08-04T10:30',''],
+  ['Bellmouth','quai','info','Descendant : CONQ début limite 15, fin limite 25. Montant : TRACY début limite 30, fin limite 40.','2023-12-18T03:12','']
+];
+function seedV2(d) {
+  const t = nowLocal(), find = (col, nom, cat) => d[col].find(x => norm(x.nom) === norm(nom) && (!cat || x.cat === cat));
+  for (const [nom, secteur, profondeur, dimensions, duree, restrictions, fond, remarque, source] of MOUILLAGES) {
+    if (find('lieux', nom, 'ancrage')) continue;
+    d.lieux.push({id:uid(), cat:'ancrage', nom, secteur, profondeur, refVert:'zéro des cartes', dimensions, duree, restrictions, fond, notes:remarque, source, cree:t, maj:t});
+  }
+  for (const [nom, cat, ton, texte, date, sourceNom] of NOTES_ON) {
+    let navireId = null, lieuId = null;
+    if (cat === 'navire') { let n = find('navires', nom); if (!n) { n = {id:uid(), nom, cree:t, maj:t}; d.navires.push(n); } navireId = n.id; }
+    else { let l = find('lieux', nom, cat); if (!l) { l = {id:uid(), cat, nom, cree:t, maj:t, ...(nom === 'Bravo' ? {traction:'50'} : {})}; d.lieux.push(l); } lieuId = l.id; }
+    if (d.notes.some(x => x.texte === texte)) continue;
+    d.notes.push({id:uid(), kind:'note', ton, texte, navireId, lieuId, source: sourceNom ? 'collegue' : 'moi', sourceNom: sourceNom || SRC_ON, date, cree:t, maj:t});
+  }
+}
+// v0.14 : liste de quais par secteur (noms seulement ; profondeurs et longueurs à compléter depuis les fiches techniques).
+const QUAIS_V3 = [
+  ['Section 12-Nord','Montréal','Fiche technique 12-Nord (2022-06)'], ['Section B-6','Montréal','Fiche technique B-6 (2022-06)'],
+  ['Sections 44N-45-46','Montréal','Fiche 44N-45-46SE (2018-07 rév.)'], ['Viau 48','Montréal','Fiche technique Viau 48 (2025-04)'], ['Viau 50','Montréal','Fiche technique Viau 50'],
+  ['Norcan 74','Montréal','Guide info quai Norcan (janv. 2023)'], ['Suncor 95-96-97','Montréal','Suncor 95-96-97 (juil. 2024)'],
+  ['Valero 102','Montréal','Valero 102-105-106 (juin 2022)'], ['Shell 103','Montréal','Shell 103 (nov. 2025)'], ['Valero 105-106','Montréal','Valero 102-105-106 (juin 2022)'],
+  ['Suncor 109-110','Montréal','Suncor 109-110 (nov. 2019)'],
+  ['Sorel 14','Sorel-Tracy','Caractéristiques Sorel-Tracy-Contrecoeur'], ['Sorel 19','Sorel-Tracy','Caractéristiques Sorel-Tracy-Contrecoeur'],
+  ['QIT 20','Sorel-Tracy','QIT Rio Tinto (rév. 13, 2025-05)'], ['QIT 21','Sorel-Tracy','QIT Rio Tinto (rév. 13, 2025-05)'], ['Tracy (quai)','Sorel-Tracy','Caractéristiques Sorel-Tracy-Contrecoeur'],
+  ['Port de Trois-Rivières','Trois-Rivières','Quais TRV BEC 2020'], ['Bécancour','Trois-Rivières','Quais TRV BEC 2020'],
+  ['Écluse de Saint-Lambert','Voie maritime','']
+];
+function seedV3(d) {
+  const t = nowLocal();
+  for (const [nom, region, src] of QUAIS_V3) {
+    if (d.lieux.some(x => norm(x.nom) === norm(nom))) continue;
+    d.lieux.push({id:uid(), cat:'quai', nom, region, source: src ? `À compléter (longueur, profondeur) : ${src}` : '', cree:t, maj:t});
+  }
+  for (const l of d.lieux) if (l.cat === 'quai' && !l.region) l.region = regionOf(l);
+}
+const pickLabel = (col, id) => { const o = DB.get(col, id); return o ? o.nom : '(fiche supprimée)'; };
+
+/* ---------- Compteurs : stretch et année ---------- */
+const affSorted = () => [...DB.list('affectations')].sort((a, b) => (a.date||'').localeCompare(b.date||'') || (a.cree||'').localeCompare(b.cree||''));
+const stretchesSorted = () => [...DB.list('stretches')].sort((a, b) => a.debut.localeCompare(b.debut));
+const currentStretch = () => { const s = stretchesSorted(); return s[s.length-1] || null; };
+function stretchOfIn(d, date) { let r = null; for (const s of [...d.stretches].sort((a, b) => a.debut.localeCompare(b.debut))) { if (s.debut <= date) r = s; else break; } return r; }
+// v0.13 : une fiche appartient au stretch indiqué par stretchId (transférable à la main).
+const stretchAffs = st => affSorted().filter(a => a.stretchId === st.id);
+const stretchCount = st => stretchAffs(st).length;
+const stretchOf = date => stretchOfIn(DB.d, date);
+const yearCount = y => DB.list('affectations').filter(a => (a.date||'').startsWith(y)).length;
+function ranks(aff) {
+  const y = aff.date.slice(0, 4);
+  const yr = affSorted().filter(a => a.date.startsWith(y)).findIndex(a => a.id === aff.id) + 1;
+  const st = DB.get('stretches', aff.stretchId);
+  const sr = st ? stretchAffs(st).findIndex(a => a.id === aff.id) + 1 : null;
+  return {y, yr, sr, st};
+}
+const stretchLabel = s => `Stretch du ${fmtDate(s.debut)}`;
+function usage(field, id) {
+  const l = DB.list('affectations').filter(a => field === 'navire' ? a.navireId === id : (a.departId === id || a.destId === id)).sort(byDateDesc);
+  return {count: l.length, last: l[0] ? l[0].date : null, list: l};
+}
+
+/* ---------- Notes : tri pour le briefing ---------- */
+const itemsFor = ({navireId, lieuId}) => DB.list('notes').filter(n => (navireId && n.navireId === navireId) || (lieuId && n.lieuId === lieuId));
+const prio = n => n.kind === 'manoeuvre' ? (n.negatifs ? 1 : 2) : ({neg:0, conseil:0}[n.ton] ?? 3);
+const sortBrief = (a, b) => prio(a) - prio(b) || byDateDesc(a, b);
+
+function itemCard(n, ctx = {}) {
+  const links = [];
+  if (n.navireId && !ctx.hideNavire) { const v = DB.get('navires', n.navireId); if (v) links.push(`<button class="chip" data-go="navire" data-id="${v.id}">${ic('ship','sm')}${esc(v.nom)}</button>`); }
+  if (n.lieuId && !ctx.hideLieu) { const l = DB.get('lieux', n.lieuId); if (l) links.push(`<button class="chip" data-go="lieu" data-id="${l.id}">${ic(CAT_IC[l.cat]||'pin','sm')}${esc(l.nom)}</button>`); }
+  const chips = links.length ? `<div class="chips">${links.join('')}</div>` : '';
+  if (n.kind === 'manoeuvre') {
+    const facts = [n.cote && COTE[n.cote], n.bt && BT[n.bt], n.sousQuille != null && `${fmtNum(n.sousQuille)} m sous quille`,
+      n.tirantEau != null && `TE ${fmtNum(n.tirantEau)} m`, n.remorqueurs && `Remorqueurs : ${n.remorqueurs}`,
+      n.vent && `Vent : ${n.vent}`, n.courant && `Courant : ${n.courant}`].filter(Boolean);
+    return `<article class="item ${n.negatifs ? 't-neg' : 't-man'}" data-kind="man${n.negatifs ? ' alert' : ''}">
+      <div class="item-top"><span class="tag t-man">${esc(MTYPE[n.mtype] || 'Manœuvre')}</span><time>${fmtDate(n.date)}</time>
+      <button class="icon-btn sm" data-go="manEdit" data-id="${n.id}" aria-label="Modifier la manœuvre">${ic('edit')}</button></div>
+      ${facts.length ? `<div class="facts">${facts.map(f => `<span>${esc(f)}</span>`).join('')}</div>` : ''}
+      ${n.positifs ? `<div class="pn pos"><span class="s" aria-label="Point positif">+</span><span>${esc(n.positifs)}</span></div>` : ''}
+      ${n.negatifs ? `<div class="pn neg"><span class="s" aria-label="Point négatif">−</span><span>${esc(n.negatifs)}</span></div>` : ''}
+      ${chips}</article>`;
+  }
+  const src = n.source ? SRC[n.source] + (n.sourceNom ? ` (${n.sourceNom})` : '') : '';
+  const kind = (n.ton === 'neg' || n.ton === 'conseil') ? 'alert' : 'pos';
+  return `<article class="item t-${esc(n.ton)}" data-kind="${kind}">
+    <div class="item-top"><span class="tag t-${esc(n.ton)}">${esc(TON[n.ton] || 'Note')}</span><time>${fmtDate(n.date)}</time>${src ? `<span>· ${esc(src)}</span>` : ''}
+    <button class="icon-btn sm" data-go="noteEdit" data-id="${n.id}" aria-label="Modifier la note">${ic('edit')}</button></div>
+    <div class="item-text">${esc(n.texte)}</div>${chips}</article>`;
+}
+const itemsBlock = (items, ctx, emptyMsg) => items.length ? items.map(i => itemCard(i, ctx)).join('') : `<p class="empty">${emptyMsg}</p>`;
+const filtersHTML = () => `<div class="filters" role="group" aria-label="Filtrer">
+  <button class="fchip" data-f="" aria-pressed="true">Tout</button><button class="fchip" data-f="alert" aria-pressed="false">Négatifs & conseils</button>
+  <button class="fchip" data-f="pos" aria-pressed="false">Positifs & infos</button><button class="fchip" data-f="man" aria-pressed="false">Manœuvres</button></div>`;
+function mountFilters(root) {
+  root.querySelectorAll('.fchip').forEach(b => b.onclick = () => {
+    root.querySelectorAll('.fchip').forEach(x => x.setAttribute('aria-pressed', x === b));
+    const f = b.dataset.f;
+    root.querySelectorAll('#items .item').forEach(it => it.hidden = !!f && !it.dataset.kind.split(' ').includes(f));
+  });
+}
+function specsHTML(rows) {
+  const half = rows.filter(r => !r.full), full = rows.filter(r => r.full);
+  const cell = (r, wide) => `<div class="spec${wide ? ' full' : ''}"><span class="k">${esc(r.k)}</span><span class="v${r.txt ? ' txt' : ''}${r.v ? '' : ' none'}">${r.v ? esc(r.v) : '—'}</span></div>`;
+  return `<div class="specs">${half.map((r, i) => cell(r, half.length % 2 === 1 && i === half.length - 1)).join('')}${full.map(r => cell(r, true)).join('')}</div>`;
+}
+
+/* ---------- Formulaires ---------- */
+const NAVIRE_F = [
+  {k:'nom', label:'Nom du navire', type:'text', req:true},
+  {k:'type', label:'Type', type:'selList', list:'type'},
+  {k:'longueur', label:'Longueur', type:'num', unit:'m', half:true},
+  {k:'largeur', label:'Largeur', type:'num', unit:'m', half:true},
+  {k:'creux', label:'Creux', type:'num', unit:'m', half:true},
+  {k:'hauteur', label:'Hauteur totale (quille → sommet)', type:'num', unit:'m', half:true},
+  {k:'puissance', label:'Puissance / propulsion', type:'text', hint:'ex. 9 000 kW, moteur lent'},
+  {k:'helice', label:'Hélice', type:'seg', opts:[['FPP','Pas fixe (FPP)'],['CPP','Pas variable (CPP)'],['','?']]},
+  {k:'rotation', label:'Rotation de l\'hélice en avant', type:'seg', opts:[['droite','À droite'],['gauche','À gauche'],['','?']]},
+  {k:'effetTransversal', label:'Effet transversal', type:'text', hint:'ex. arrière vers bâbord en battant arrière'},
+  {k:'marcheArriere', label:'Marche arrière (reculon)', type:'text'},
+  {k:'gouvernail', label:'Gouvernail', type:'selList', list:'gouvernail'},
+  {k:'gouvNote', label:'Réponse à la barre (notes)', type:'text'},
+  {k:'bt', label:'Propulseur d\'étrave (BT)', type:'text', hint:'ex. 1 200 kW, ou « aucun »'},
+  {k:'stOn', label:'Propulseur arrière (ST)', type:'check'},
+  {k:'st', label:'Propulseur de poupe (ST) — puissance', type:'text', when:['stOn', true]},
+  {k:'recul', label:'Puissance de recul', type:'num', unit:'%', half:true},
+  {k:'swl', label:'Bittes (SWL)', type:'num', unit:'t', half:true},
+  {k:'confirme', label:'Données confirmées à bord le', type:'date'},
+  {k:'notes', label:'Particularités générales', type:'textarea'}
+];
+const LIEU_F = [
+  {k:'cat', label:'Catégorie', type:'seg', opts:Object.entries(CAT)},
+  {k:'nom', label:'Nom', type:'text', req:true, hint:'ex. Section 36'},
+  {k:'region', label:'Secteur (liste des quais)', type:'select', opts:['', ...REGIONS], show:['quai','lieu']},
+  {k:'secteur', label:'Secteur / précision', type:'text', hint:'ex. Port de Montréal'},
+  {k:'profondeur', label:'Profondeur de référence', type:'num', unit:'m', half:true, show:['quai','ancrage']},
+  {k:'refVert', label:'Référence verticale', type:'text', half:true, show:['quai','ancrage'], hint:'ex. zéro des cartes'},
+  {k:'station', label:'Station de niveau d\'eau', type:'select', opts:['', ...STATIONS.map(s => s[1])], show:['quai']},
+  {k:'angle', label:'Angle (alignement)', type:'text', half:true, show:['quai'], hint:'ex. 167°'},
+  {k:'hauteur', label:'Hauteur du quai', type:'num', unit:'m', half:true, show:['quai']},
+  {k:'procedure', label:'Procédure d\'approche / de départ', type:'textarea', show:['quai']},
+  {k:'navette', label:'Téléphone de la navette', type:'text', show:['quai'], hint:'Vide = navette Ville-Marie'},
+  {k:'dimensions', label:'Dimensions', type:'text', show:['ancrage']},
+  {k:'duree', label:'Durée permise (pétrolier / autres)', type:'text', show:['ancrage']},
+  {k:'restrictions', label:'Restrictions (longueur, largeur, FG)', type:'text', show:['ancrage']},
+  {k:'fond', label:'Nature du fond / tenue', type:'text', show:['ancrage']},
+  {k:'compagnie', label:'Compagnie', type:'text', show:['remorqueur']},
+  {k:'traction', label:'Traction (bollard pull), en tonnes', type:'text', show:['remorqueur'], hint:'ex. 50'},
+  {k:'source', label:'Source de l\'information', type:'text'},
+  {k:'verifie', label:'Information vérifiée le', type:'date'},
+  {k:'notes', label:'Notes', type:'textarea'}
+];
+const NOTE_F = [
+  {k:'ton', label:'Type de note', type:'seg', req:true, opts:[['neg','Négatif'],['conseil','Conseil'],['pos','Positif'],['info','Info']]},
+  {k:'texte', label:'Note', type:'textarea', req:true, hint:'Astuce : le micro du clavier permet de dicter la note.'},
+  {k:'navireId', label:'Navire', type:'pick', col:'navires'},
+  {k:'lieuId', label:'Quai, ancrage, remorqueur ou lieu', type:'pick', col:'lieux'},
+  {k:'source', label:'Source', type:'seg', opts:Object.entries(SRC)},
+  {k:'sourceNom', label:'Nom de la source (facultatif)', type:'text'},
+  {k:'date', label:'Date', type:'datetime'}
+];
+const MAN_F = [
+  {k:'mtype', label:'Manœuvre', type:'seg', opts:Object.entries(MTYPE)},
+  {k:'lieuId', label:'Quai / lieu', type:'pick', col:'lieux', req:true, defCat:r => r.querySelector('input[name="mtype"]:checked')?.value === 'mouillage' ? 'ancrage' : 'quai'},
+  {k:'navireId', label:'Navire', type:'pick', col:'navires', req:true},
+  {k:'cote', label:'Côté à quai', type:'seg', opts:[['bd','Bâbord'],['td','Tribord'],['','—']]},
+  {k:'bt', label:'Propulseur d\'étrave', type:'seg', opts:[['bon','Efficace'],['moyen','Moyen'],['faible','Faible'],['non','Non utilisé']]},
+  {k:'sousQuille', label:'Eau sous quille', type:'num', unit:'m', half:true},
+  {k:'tirantEau', label:'Tirant d\'eau', type:'num', unit:'m', half:true},
+  {k:'remorqueurs', label:'Remorqueurs', type:'text', hint:'ex. 1 à l\'arrière, Ocean …'},
+  {k:'vent', label:'Vent', type:'text', half:true},
+  {k:'courant', label:'Courant', type:'text', half:true},
+  {k:'positifs', label:'Points positifs', type:'textarea', cls:'pos'},
+  {k:'negatifs', label:'Points négatifs', type:'textarea', cls:'neg'},
+  {k:'date', label:'Date', type:'datetime'}
+];
+// Fiche navire (spécification du 17 nov. + ajouts du 19 nov.). Les champs n_* sont ceux du navire : préchargés et réenregistrés dans sa fiche.
+const NAV_KEYS = ['longueur','largeur','creux','hauteur','type','bt','stOn','st','recul','gouvernail','swl'];
+const AFF_F = [
+  {sec:'Affectation'},
+  {k:'date', label:'Date et heure d\'affectation', type:'datetime', req:true},
+  {k:'navireId', label:'Nom du navire', type:'pick', col:'navires', req:true},
+  {sec:'Navire — données fixes'},
+  {k:'n_type', label:'Type', type:'selList', list:'type'},
+  {k:'n_longueur', label:'Longueur', type:'num', unit:'m', half:true},
+  {k:'n_largeur', label:'Largeur', type:'num', unit:'m', half:true},
+  {k:'n_creux', label:'Creux', type:'num', unit:'m', half:true},
+  {k:'n_hauteur', label:'Hauteur totale', type:'num', unit:'m', half:true},
+  {k:'n_bt', label:'Propulseur avant (BT)', type:'text', hint:'puissance, ex. 1 200 hp'},
+  {k:'n_stOn', label:'Propulseur arrière (ST)', type:'check'},
+  {k:'n_st', label:'Propulseur arrière — puissance', type:'text', when:['n_stOn', true]},
+  {k:'n_recul', label:'Puissance de recul', type:'num', unit:'%', half:true},
+  {k:'n_swl', label:'Bittes (SWL)', type:'num', unit:'t', half:true},
+  {k:'n_gouvernail', label:'Gouvernail', type:'selList', list:'gouvernail'},
+  {sec:'Voyage — données du jour'},
+  {k:'depart', label:'Départ', type:'quaiSel'},
+  {k:'dest', label:'Destination', type:'quaiSel'},
+  {k:'eta', label:'ETA à destination', type:'datetime', blank:true},
+  {k:'cargo', label:'Cargaison', type:'datalist', list:'cargo', half:true},
+  {k:'quantite', label:'Quantité', type:'text', half:true},
+  {k:'dg', label:'Matières dangereuses (quantité)', type:'text'},
+  {k:'teAv', label:'Tirant d\'eau AV', type:'num', unit:'m', half:true},
+  {k:'teAr', label:'Tirant d\'eau AR', type:'num', unit:'m', half:true},
+  {calc:'ta', label:'Tirant d\'air (calculé)'},
+  {k:'agent', label:'Agent', type:'text', half:true},
+  {k:'meteo', label:'Météo', type:'text', half:true},
+  {sec:'Temps'},
+  {k:'hDepart', label:'Parti', type:'time', half:true},
+  {k:'hDebarque', label:'Débarqué', type:'time', half:true},
+  {k:'hTugs', label:'Remorqueurs', type:'time', half:true},
+  {k:'hLines', label:'Linesmen', type:'time', half:true},
+  {k:'releve', label:'Relève', type:'check'},
+  {k:'hReleve', label:'Heure de la relève', type:'time', when:['releve', true]},
+  {sec:'Remorqueurs'},
+  {k:'tugAvId', label:'Remorqueur avant', type:'pick', col:'lieux', defCat:'remorqueur'},
+  {k:'tugArId', label:'Remorqueur arrière', type:'pick', col:'lieux', defCat:'remorqueur'},
+  {sec:'Heures aux points d\'appel'},
+  {k:'sens', label:'Sens', type:'seg', opts:[['montant','Montant (PDO → 110)'],['descendant','Descendant (110 → PDO)']]},
+  {k:'vitesse', label:'Vitesse prévue', type:'num', unit:'nd', hint:'Vide = 10 nœuds en montant, 14 en descendant'},
+  {sec:'Compteur'},
+  {k:'stretchId', label:'Stretch de cette fiche', type:'selkv', opts:() => [['', '— aucun —'], ...stretchesSorted().reverse().map(s => [s.id, stretchLabel(s) + (s === currentStretch() ? ' (en cours)' : '')])], hint:'Pour corriger un oubli de remise à zéro : choisissez l\'autre stretch.'}
+];
+const liste = k => DB.d.reglages.listes[k] || [];
+function quaisDe(reg) {
+  if (reg === 'Mouillages') return DB.list('lieux').filter(l => l.cat === 'ancrage').sort(byName);
+  return DB.list('lieux').filter(l => (l.cat === 'quai' || l.cat === 'lieu') && regionOf(l) === reg).sort(byName);
+}
+const regOfId = id => { const l = DB.get('lieux', id); return !l ? 'Montréal' : l.cat === 'ancrage' ? 'Mouillages' : regionOf(l); };
+const quaiOpts = (reg, sel) => `<option value="">— choisir —</option>` + quaisDe(reg).map(l => `<option value="${l.id}"${l.id === sel ? ' selected' : ''}>${esc(l.nom)}${l.cat === 'ancrage' && l.profondeur != null ? ` · ${fmtNum(l.profondeur)} m` : ''}</option>`).join('');
+// Lieux de départ et de destination d'une fiche (v0.14 : « Autre » = texte libre)
+const depLieu = a => a.departAutre ? null : DB.get('lieux', a.departId);
+const destLieu = a => (a.destAutre || a.destMode === 'mer') ? null : DB.get('lieux', a.destId);
+const depNom = a => a.departAutre ? (a.departTxt || 'Autre') : (a.departId ? pickLabel('lieux', a.departId) : '');
+const destNom = a => (a.destAutre || a.destMode === 'mer') ? (a.destTxt || 'Autre') : (a.destId ? pickLabel('lieux', a.destId) : '');
+const versLambert = a => /lambert|voie maritime|seaway|ecluse/.test(norm(destNom(a)));
+const deLambert = a => /lambert|voie maritime|seaway|ecluse/.test(norm(depNom(a)));
+const tirantAir = (nav, a) => { const h = nav.hauteur, t = a.teAr; return h != null && t != null && !Number.isNaN(t) ? r2(h - t) : null; };
+const surRichelieu = a => /richelieu/.test(norm(destNom(a) + ' ' + depNom(a)));
+const degagDe = a => DEGAG.filter(d => !d.si || (d.si === 'lambert' ? versLambert(a) || deLambert(a) : surRichelieu(a)));
+// Heure « 0630 », « 630 », « 6:30 », « 6h30 » → « 06:30 »
+function parseTime(v) {
+  const s = String(v || '').trim(); if (!s) return '';
+  const m = s.match(/^(\d{1,2})\s*[:hH.]?\s*(\d{2})$/) || (s.match(/^\d{3,4}$/) && [null, s.slice(0, -2), s.slice(-2)]);
+  if (!m) return null; const h = +m[1], mi = +m[2];
+  return h < 24 && mi < 60 ? `${pad(h)}:${pad(mi)}` : null;
+}
+const hhmm = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+
+function fieldHTML(f, v) {
+  const id = 'f_' + f.k;
+  const lbl = `<span class="lbl">${esc(f.label)}${f.req ? ' <i class="req">*</i>' : ''}</span>`;
+  const hint = f.hint ? `<span class="hint">${esc(f.hint)}</span>` : '';
+  let h;
+  switch (f.type) {
+    case 'num':
+      h = `<label class="field" for="${id}">${lbl}<span class="with-unit"><input id="${id}" name="${f.k}" type="text" inputmode="decimal" autocomplete="off" value="${v == null ? '' : esc(String(v).replace('.', ','))}"><span>${esc(f.unit)}</span></span>${hint}</label>`; break;
+    case 'textarea':
+      h = `<label class="field ${f.cls || ''}" for="${id}">${lbl}<textarea id="${id}" name="${f.k}" rows="4">${esc(v)}</textarea>${hint}</label>`; break;
+    case 'select':
+      h = `<label class="field" for="${id}">${lbl}<select id="${id}" name="${f.k}">${f.opts.map(o => `<option value="${esc(o)}"${(v || '') === o ? ' selected' : ''}>${o ? esc(o) : '—'}</option>`).join('')}</select>${hint}</label>`; break;
+    case 'date':
+      h = `<label class="field" for="${id}">${lbl}<input id="${id}" name="${f.k}" type="date" value="${esc(v || '')}">${hint}</label>`; break;
+    case 'datetime':
+      h = `<label class="field" for="${id}">${lbl}<input id="${id}" name="${f.k}" type="datetime-local" value="${esc(v || (f.blank ? '' : nowLocal()))}">${hint}</label>`; break;
+    case 'time':
+      h = `<div class="field"><label class="lbl" for="${id}">${esc(f.label)}</label><span class="timef"><input id="${id}" name="${f.k}" type="text" inputmode="numeric" placeholder="hhmm" autocomplete="off" value="${esc(v || '')}"><button type="button" class="btn" data-now="${id}">Maint.</button></span></div>`; break;
+    case 'check':
+      h = `<label class="chk" for="${id}"><input id="${id}" name="${f.k}" type="checkbox"${v ? ' checked' : ''}><span>${esc(f.label)}</span></label>`; break;
+    case 'selList': {
+      const L = liste(f.list), opts = ['', ...L, ...(v && !L.includes(v) ? [v] : [])];
+      h = `<label class="field" for="${id}">${lbl}<select id="${id}" name="${f.k}">${opts.map(o => `<option value="${esc(o)}"${(v || '') === o ? ' selected' : ''}>${o ? esc(o) : '—'}</option>`).join('')}</select>${hint}</label>`; break; }
+    case 'datalist':
+      h = `<label class="field" for="${id}">${lbl}<input id="${id}" name="${f.k}" type="text" list="dl_${id}" autocomplete="off" value="${esc(v)}"><datalist id="dl_${id}">${liste(f.list).map(o => `<option value="${esc(o)}">`).join('')}</datalist>${hint}</label>`; break;
+    case 'quaiSel': {
+      const q = v || {}, reg = q.id ? regOfId(q.id) : 'Montréal';
+      h = `<div class="field" data-qs="${f.k}"><span class="lbl">${esc(f.label)}</span>
+        <label class="chk" for="${id}Autre"><input id="${id}Autre" type="checkbox"${q.autre ? ' checked' : ''}><span>Autre (texte libre)</span></label>
+        <div class="grid2" data-qsl><select id="${id}Reg" aria-label="Secteur">${[...REGIONS, 'Mouillages'].map(r => `<option${r === reg ? ' selected' : ''}>${esc(r)}</option>`).join('')}</select>
+        <select id="${id}Id" aria-label="${esc(f.label)} : quai">${quaiOpts(reg, q.id)}</select></div>
+        <input id="${id}Txt" data-qst type="text" placeholder="ex. Maroc, Louisiane, en mer" autocomplete="off" value="${esc(q.txt || '')}">${hint}</div>`; break; }
+    case 'selkv': {
+      const opts = typeof f.opts === 'function' ? f.opts() : f.opts;
+      h = `<label class="field" for="${id}">${lbl}<select id="${id}" name="${f.k}">${opts.map(([val, l]) => `<option value="${esc(val)}"${(v || '') === val ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>${hint}</label>`; break; }
+    case 'seg':
+      h = `<fieldset class="field" id="${id}"><legend class="lbl">${esc(f.label)}${f.req ? ' <i class="req">*</i>' : ''}</legend><div class="seg">${f.opts.map(([val, l]) =>
+        `<label class="seg-opt t-${esc(val)}"><input type="radio" name="${f.k}" value="${esc(val)}"${(v ?? '') === val ? ' checked' : ''}><span>${esc(l)}</span></label>`).join('')}</div>${hint}</fieldset>`; break;
+    case 'pick':
+      h = `<div class="field"><span class="lbl" id="${id}_l">${esc(f.label)}${f.req ? ' <i class="req">*</i>' : ''}</span><button type="button" class="pick${v ? '' : ' empty'}" id="${id}" data-k="${f.k}" data-value="${esc(v || '')}" aria-labelledby="${id}_l ${id}"><span class="pv">${esc(v ? pickLabel(f.col, v) : 'Choisir ou créer…')}</span>${ic('chev')}</button>${hint}</div>`; break;
+    default:
+      h = `<label class="field" for="${id}">${lbl}<input id="${id}" name="${f.k}" type="text" autocomplete="off" value="${esc(v)}">${hint}</label>`;
+  }
+  if (f.when) h = `<div data-when="${esc(f.when[0])}" data-wv="${esc(String(f.when[1]))}">${h}</div>`;
+  return f.show ? `<div data-show="${f.show.join(' ')}">${h}</div>` : h;
+}
+function formHTML(fields, o, isEdit) {
+  let h = '';
+  for (let i = 0; i < fields.length; i++) {
+    const f = fields[i], g = fields[i+1];
+    if (f.sec) { h += `<h2 class="sec">${esc(f.sec)}</h2>`; continue; }
+    if (f.calc) { h += `<div class="verdict unk" id="calc_${f.calc}">${esc(f.label)} : —</div>`; continue; }
+    if (f.half && g && g.half) { const sh = f.show ? ` data-show="${f.show.join(' ')}"` : ''; h += `<div class="grid2"${sh}>${fieldHTML({...f, show:null}, o[f.k])}${fieldHTML({...g, show:null}, o[g.k])}</div>`; i++; }
+    else h += fieldHTML(f, o[f.k]);
+  }
+  return `<form id="frm" class="form" novalidate>${h}
+    <button class="btn primary block tall" type="submit">${ic('check')} Enregistrer</button>
+    ${isEdit ? `<div><button type="button" class="btn danger block" id="btnDel">Supprimer</button></div>` : ''}</form>`;
+}
+function readForm(form, fields) {
+  const o = {};
+  for (const f of fields) {
+    if (!f.k) continue;
+    if (f.type === 'quaiSel') { const au = form.querySelector(`#f_${f.k}Autre`).checked; o[f.k + 'Autre'] = au; o[f.k + 'Id'] = au ? null : (form.querySelector(`#f_${f.k}Id`).value || null); o[f.k + 'Txt'] = form.querySelector(`#f_${f.k}Txt`).value.trim(); }
+    else if (f.type === 'check') o[f.k] = !!form.querySelector('#f_' + f.k).checked;
+    else if (f.type === 'time') o[f.k] = parseTime(form.querySelector('#f_' + f.k).value);
+    else if (f.type === 'seg') o[f.k] = form.querySelector(`input[name="${f.k}"]:checked`)?.value ?? '';
+    else if (f.type === 'pick') o[f.k] = form.querySelector('#f_' + f.k).dataset.value || null;
+    else if (f.type === 'num') o[f.k] = parseNum(form.querySelector('#f_' + f.k).value);
+    else o[f.k] = form.querySelector('#f_' + f.k).value.trim();
+  }
+  return o;
+}
+function mountForm(root, fields, {onSubmit, onDelete, validate, delMsg, onPick}) {
+  const form = root.querySelector('#frm');
+  root.querySelectorAll('.pick').forEach(b => {
+    const f = fields.find(x => x.k === b.dataset.k);
+    b.onclick = () => openPicker({
+      title: f.label, col: f.col, allowNone: !f.req,
+      defCat: typeof f.defCat === 'function' ? f.defCat(root) : (f.defCat || 'quai'),
+      onPick: id => { b.dataset.value = id || ''; b.querySelector('.pv').textContent = id ? pickLabel(f.col, id) : 'Choisir ou créer…'; b.classList.toggle('empty', !id); if (onPick) onPick(f.k, id, form); }
+    });
+  });
+  root.querySelectorAll('[data-now]').forEach(b => b.onclick = () => { const i = root.querySelector('#' + b.dataset.now); i.value = hhmm(); });
+  const updWhen = () => root.querySelectorAll('[data-when]').forEach(d => {
+    const k = d.dataset.when, el = form.querySelector('#f_' + k);
+    const val = el && el.type === 'checkbox' ? String(el.checked) : (form.querySelector(`input[name="${k}"]:checked`)?.value ?? '');
+    d.hidden = val !== d.dataset.wv;
+  });
+  form.addEventListener('change', updWhen); updWhen();
+  root.querySelectorAll('[data-qs]').forEach(d => {
+    const k = d.dataset.qs, au = d.querySelector(`#f_${k}Autre`), rg = d.querySelector(`#f_${k}Reg`), sel = d.querySelector(`#f_${k}Id`);
+    const upd = () => { d.querySelector('[data-qsl]').hidden = au.checked; d.querySelector('[data-qst]').hidden = !au.checked; };
+    au.onchange = upd; rg.onchange = () => { sel.innerHTML = quaiOpts(rg.value, null); }; upd();
+  });
+  if (form.querySelector('input[name="cat"]')) {
+    const upd = () => { const c = form.querySelector('input[name="cat"]:checked')?.value; root.querySelectorAll('[data-show]').forEach(d => d.hidden = !d.dataset.show.split(' ').includes(c)); };
+    form.addEventListener('change', e => { if (e.target.name === 'cat') upd(); }); upd();
+  }
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const o = readForm(form, fields);
+    for (const f of fields) {
+      if (!f.k) continue;
+      if (f.type === 'time' && o[f.k] === null) { toast(`Heure invalide : ${f.label} (ex. 0630)`); form.querySelector('#f_' + f.k).focus(); return; }
+      if (f.req && (o[f.k] == null || o[f.k] === '')) { toast(`À remplir : ${f.label}`); form.querySelector('#f_' + f.k)?.scrollIntoView({block:'center'}); return; }
+      if (f.type === 'num' && Number.isNaN(o[f.k])) { toast(`Nombre invalide : ${f.label} (ex. 9,70)`); form.querySelector('#f_' + f.k).focus(); return; }
+    }
+    const err = validate && validate(o);
+    if (err) { toast(err); return; }
+    onSubmit(o);
+  });
+  const del = root.querySelector('#btnDel');
+  if (del) del.onclick = () => confirmInline(del, delMsg || 'Supprimer définitivement cette fiche ?', onDelete, 'Supprimer');
+}
+function confirmInline(btn, msg, yes, yesLabel, calm) {
+  btn.hidden = true;
+  const d = document.createElement('div');
+  d.className = 'confirm' + (calm ? ' calm' : '');
+  d.innerHTML = `<p>${esc(msg)}</p><div class="row"><button type="button" class="btn ${calm ? 'primary' : 'danger-fill'}">${esc(yesLabel)}</button><button type="button" class="btn">Annuler</button></div>`;
+  btn.after(d);
+  const [y, n] = d.querySelectorAll('button');
+  y.onclick = yes; n.onclick = () => { d.remove(); btn.hidden = false; };
+}
+const saveAction = {label:'Enregistrer', fn: () => $('#frm')?.requestSubmit()};
+
+/* ---------- Sélecteur « choisir ou créer » ---------- */
+let sheetPushed = false, ignorePop = false;
+function subOf(col, o) {
+  if (col === 'navires') return [o.type, o.longueur != null && o.largeur != null ? `${fmtNum(o.longueur)} × ${fmtNum(o.largeur)} m` : ''].filter(Boolean).join(' · ') || 'Fiche à compléter';
+  return [CAT[o.cat], o.secteur].filter(Boolean).join(' · ');
+}
+function openPicker({title, col, onPick, allowNone, defCat}) {
+  const sh = $('#sheet');
+  sh.innerHTML = `<div class="sheet-bar"><button class="icon-btn" id="shClose" aria-label="Fermer">${ic('close')}</button><h2>${esc(title)}</h2></div>
+    <div class="sheet-body"><input id="shQ" type="search" placeholder="Taper un nom…" autocomplete="off" aria-label="Rechercher ou créer"><div id="shCreate" class="create"></div><div id="shList" class="stack"></div></div>`;
+  sh.hidden = false;
+  if (PWA) { try { history.pushState({sheet:1}, ''); sheetPushed = true; } catch (e) {} }
+  const draw = () => {
+    const q = $('#shQ').value.trim(), Q = norm(q);
+    const items = [...DB.list(col)].filter(o => !Q || norm(o.nom).includes(Q) || norm(o.secteur).includes(Q)).sort(byName);
+    const exact = items.some(o => norm(o.nom) === Q);
+    $('#shCreate').innerHTML = q && !exact ? (col === 'navires'
+      ? `<button class="btn primary block" data-new="navire">${ic('plus')} Créer le navire « ${esc(q)} »</button>`
+      : `<span class="lbl">Créer « ${esc(q)} » comme :</span><div class="seg">${Object.keys(CAT).map(c => `<button class="btn ${c === defCat ? 'primary' : ''}" data-new="${c}">${esc(CAT[c])}</button>`).join('')}</div>`) : '';
+    $('#shList').innerHTML = (allowNone && !Q ? `<button class="li" data-pid="">${ic('close')}<span class="li-main"><span class="t">Aucun</span></span></button>` : '')
+      + items.map(o => `<button class="li" data-pid="${o.id}">${ic(col === 'navires' ? 'ship' : (CAT_IC[o.cat] || 'pin'))}<span class="li-main"><span class="t">${esc(o.nom)}</span><span class="s">${esc(subOf(col, o))}</span></span></button>`).join('')
+      + (!items.length && !q ? `<p class="empty">Aucune fiche encore. Tapez un nom pour la créer.</p>` : '');
+  };
+  sh.onclick = e => {
+    const p = e.target.closest('[data-pid]');
+    if (p) { closeSheet(true); onPick(p.dataset.pid || null); return; }
+    const nw = e.target.closest('[data-new]');
+    if (nw) {
+      const q = $('#shQ').value.trim();
+      const o = col === 'navires' ? DB.put('navires', {nom:q}) : DB.put('lieux', {nom:q, cat:nw.dataset.new});
+      toast(col === 'navires' ? `Navire « ${q} » créé` : `${CAT[nw.dataset.new]} « ${q} » créé`);
+      closeSheet(true); onPick(o.id); return;
+    }
+    if (e.target.closest('#shClose')) closeSheet(true);
+  };
+  $('#shQ').oninput = draw; draw();
+  setTimeout(() => $('#shQ')?.focus(), 60);
+}
+function closeSheet(viaUI) {
+  const sh = $('#sheet'); if (sh.hidden) return;
+  sh.hidden = true; sh.innerHTML = '';
+  if (viaUI && sheetPushed) { ignorePop = true; history.back(); }
+  sheetPushed = false;
+}
+
+/* ---------- Navigation ---------- */
+const stack = [];
+const TAB_OF = {home:'home', perso:'home', apps:'home', sites:'home', search:'home', noteEdit:'home', manEdit:'home', navires:'home', navire:'home', navireEdit:'home', compteurs:'home',
+  affectations:'affectations', aff:'affectations', affEdit:'affectations', briefing:'affectations', heures:'affectations',
+  riviere:'riviere', lieux:'riviere', lieu:'riviere', lieuEdit:'riviere', degagements:'riviere',
+  reference:'reference', regles:'reference'};
+const TABS_M = [['riviere', 'ship', 'Rivière'], ['affectations', 'note', 'Fiches'], ['home', 'home', 'Accueil'], ['bottin', 'book', 'Bottin'], ['reference', 'clip', 'Référence']];
+const TABS_B = [['favoris', 'heart', 'Favoris'], ['commercial', 'ship', 'Commercial'], ['home', 'home', 'Accueil'], ['pilotes', 'wheel', 'Pilotes'], ['transport', 'taxi', 'Transport']];
+const bottinDef = () => (DB.d.reglages.favoris || []).length ? 'favoris' : 'pilotes';
+function drawTabs(top) {
+  const isB = top.view === 'bottin', cur = isB ? (top.params.s || bottinDef()) : TAB_OF[top.view];
+  $('#tabs').innerHTML = (isB ? TABS_B : TABS_M).map(([t, i, l]) => {
+    const on = t === cur || (t === 'home' && !isB && cur === 'home') ? ' aria-current="page"' : '', sec = isB && t !== 'home' ? ` data-s="${t}"` : '';
+    return t === 'home' ? `<button class="tab tab-home" data-tab="home" aria-label="Accueil"${on}><span class="dot">${ic(i)}</span>${l}</button>` : `<button class="tab" data-tab="${t}"${sec}${on}>${ic(i)}${l}</button>`;
+  }).join('');
+}
+function go(view, params = {}, opt = {}) {
+  if (opt.replace && stack.length) stack[stack.length - 1] = {view, params};
+  else if (opt.reset) { stack.length = 0; stack.push({view:'home', params:{}}); if (view !== 'home') stack.push({view, params}); }
+  else { stack.push({view, params}); if (PWA) { try { history.pushState({d:stack.length}, ''); } catch (e) {} } }
+  render(); window.scrollTo(0, 0);
+}
+function back() { if (stack.length > 1) { stack.pop(); render(); window.scrollTo(0, 0); } }
+function dropFromStack(id) { const k = stack.filter(s => s.params && s.params.id !== id); stack.length = 0; stack.push(...(k.length ? k : [{view:'home', params:{}}])); render(); }
+window.addEventListener('popstate', () => {
+  if (ignorePop) { ignorePop = false; return; }
+  if (!$('#sheet').hidden) { sheetPushed = false; closeSheet(false); return; }
+  back();
+});
+function render() {
+  const top = stack[stack.length - 1];
+  const v = (VIEWS[top.view] || VIEWS.notFound)(top.params || {});
+  const t = $('#title');
+  const isHome = top.view === 'home';
+  if (isHome) t.innerHTML = '<button class="brand-btn" id="brandBtn" aria-label="ProPilot, ouvrir les réglages"><span class="p">Pro</span><span class="q">Pilot</span></button>'; else t.textContent = v.title;
+  $('.bar').classList.toggle('is-home', isHome); $('#cnt').hidden = !isHome; $('#main').classList.toggle('home', isHome);
+  document.title = top.view === 'home' ? 'ProPilot' : `${v.title} · ProPilot`;
+  updStatus();
+  $('#btnBack').hidden = stack.length < 2;
+  const act = $('#barAct'); act.innerHTML = '';
+  if (v.action) { const b = document.createElement('button'); b.className = 'bar-act'; b.innerHTML = (v.action.icon ? ic(v.action.icon, 'sm') : '') + `<span>${esc(v.action.label)}</span>`; b.onclick = v.action.fn; act.appendChild(b); }
+  const main = $('#main'); main.innerHTML = v.html;
+  if (v.mount) v.mount(main);
+  drawTabs(top);
+}
+let toastT;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2800); }
+
+/* ---------- Fiche navire : calculs et rappels ---------- */
+const teMax = a => { const v = [a.teAv, a.teAr].filter(x => x != null && !Number.isNaN(x)); return v.length ? Math.max(...v) : null; };
+const r2 = n => Math.round(n * 100) / 100;
+const stCode = nom => (STATIONS.find(s => s[1] === nom) || [])[0];
+function isMtlQuai(l) { return !!l && l.cat === 'quai' && (l.station === 'Montréal' || /montr|mtl/.test(norm((l.nom || '') + ' ' + (l.secteur || ''))) || /^section\s*\d/.test(norm(l.nom))); }
+function reglesFiche(a, nav, dest) {
+  const R = [], tm = teMax(a);
+  if (isMtlQuai(dest)) {
+    const no = firstNum(dest.nom);
+    if (no != null && no >= 22 && no <= 32) R.push({t:`<b>Quai ${no} : DSQ requise le long du quai de 0,91 m</b> (quais 22 à 32).`, s:REG_SRC});
+    else R.push({t:'<b>Approche du poste et le long du quai : DSQ de 0,3 m.</b>', s:REG_SRC});
+    R.push({t:'Chenal : 11,3 m jusqu\'à M177 (quai 62) · <b>11,0 m de M177 à ISH</b> (quai 40) · <b>10,70 m d\'ISH à 12N</b>. Entre M177 et ISH, DSQ min. 0,61 m ; <b>sous 0,90 m : 4 nœuds max sur le fond et au moins un remorqueur</b>. En amont d\'ISH, enfoncement calculé à 9 nœuds.', s:REG_SRC});
+  }
+  if (dest && dest.cat === 'ancrage') {
+    R.push({t:`<b>Mouillage : DSQ pétrolier 10 % du TE max · autres navires 0,90 m.</b>${tm != null ? ` Profondeur requise : pétrolier ${fmtNum(r2(tm * 1.1))} m · autres ${fmtNum(r2(tm + 0.9))} m.` : ''}${dest.profondeur != null ? ` Profondeur du mouillage : ${fmtM(dest.profondeur)}.` : ''}`, s:DSQ_MOU_SRC});
+  }
+  return R;
+}
+const regHTML = x => `<p class="reg">📘 ${x.t}<span class="src">Règlement — ${esc(x.s)} · note automatique, non modifiable</span></p>`;
+function tugHTML(pos, l, nav) {
+  if (!l) return '';
+  const tr = firstNum(l.traction), swl = firstNum(nav.swl);
+  let cls = 'unk', msg = `SWL ${swl == null ? 'inconnu' : fmtNum(swl) + ' t'} · traction ${tr == null ? 'inconnue' : fmtNum(tr) + ' t'} : vérification impossible`;
+  if (tr != null && swl != null) {
+    if (tr <= swl) { cls = 'ok'; msg = `Traction ${fmtNum(tr)} t ≤ SWL ${fmtNum(swl)} t : correct`; }
+    else { cls = 'bad'; msg = `Traction ${fmtNum(tr)} t > SWL ${fmtNum(swl)} t : ne pas dépasser ${Math.floor(swl / tr * 100)} % de la traction`; }
+  }
+  return `<button class="verdict ${cls} li" data-go="lieu" data-id="${l.id}" style="width:100%;text-align:left">${ic('tug')}<span>${esc(pos)} : ${esc(l.nom)}<small>${esc(msg)}</small></span></button>`;
+}
+function dsqQuaiHTML(a, dest, tm) {
+  if (!dest || dest.cat !== 'quai') return '';
+  const sc = stCode(dest.station), nv = sc && a.niveaux ? a.niveaux[sc] : null;
+  if (dest.profondeur == null) return `<div class="verdict unk">Quai ${esc(dest.nom)} : profondeur inconnue<small>Ajoutez-la dans la fiche du quai pour calculer la DSQ au quai.</small></div>`;
+  if (!sc) return `<div class="verdict unk">Quai ${esc(dest.nom)} (${fmtM(dest.profondeur)}) : station de niveau d'eau non choisie<small>Choisissez la station dans la fiche du quai.</small></div>`;
+  if (nv == null || tm == null) return `<div class="verdict unk">Quai ${esc(dest.nom)} (${fmtM(dest.profondeur)}) : entrez le niveau à ${esc(dest.station)} et le TE</div>`;
+  const dsq = r2(dest.profondeur + nv - tm), req = isMtlQuai(dest) ? ((firstNum(dest.nom) >= 22 && firstNum(dest.nom) <= 32) ? 0.91 : 0.3) : null;
+  return `<div class="verdict ${req != null && dsq < req ? 'bad' : 'ok'}">Au quai ${esc(dest.nom)} : DSQ ${fmtNum(dsq)} m<small>${fmtM(dest.profondeur)} + ${fmtNum(nv)} (${esc(dest.station)}) − ${fmtM(tm)}${req != null ? ` · requis ${fmtNum(req)} m` : ''}</small></div>`;
+}
+function rencHTML(rc, nav) {
+  const comb = rc.larg != null && nav.largeur != null ? r2(rc.larg + nav.largeur) : null;
+  return `<div class="ev" style="grid-template-columns:1fr auto"><span><b>${esc(rc.nom || 'Autre navire')}</b> · ${rc.long != null ? fmtM(rc.long) : '?'} × ${rc.larg != null ? fmtM(rc.larg) : '?'}<br>
+    Largeur combinée : <b>${comb != null ? fmtM(comb) : '?'}</b>${comb != null && comb >= 65 ? ' <span class="warn-t">≥ 65 m : rapport post-Panamax (Avis 27A)</span>' : ''}<br>
+    <span class="sub">${esc(rc.p1 || '—')} / ${esc(rc.p2 || '—')}</span></span><button class="icon-btn sm" data-rcdel="${rc.id}" aria-label="Supprimer">${ic('close')}</button></div>`;
+}
+
+/* ---------- v0.14 : déroulement, appels, heures, dégagements, photos ---------- */
+function guessSens(a) {
+  const rd = regionOf(depLieu(a)), rv = regionOf(destLieu(a));
+  if (deLambert(a) || rd === 'Montréal' || rd === 'Voie maritime') return 'descendant';
+  if (versLambert(a) || rv === 'Montréal' || rv === 'Voie maritime' || rd === 'Trois-Rivières') return 'montant';
+  return 'montant';
+}
+function etaTable(a) {
+  const sens = a.sens || guessSens(a), up = sens === 'montant';
+  const codes = POINTS.map(p => p[0]).filter(c => c !== 'CIP2' && c !== 'ECL');
+  if ((up && versLambert(a)) || (!up && deLambert(a))) codes.push('CIP2', 'ECL');
+  if (!up) codes.reverse();
+  const vDef = a.vitesse || (up ? 10 : 14), pas = a.passages || {};
+  let cur = tMin(pas[codes[0]] || a.hDepart);
+  const rows = codes.map((c, i) => {
+    let dist = null, k = null, v = null;
+    if (i > 0) { k = segKey(codes[i - 1], c); dist = SEG[k]; v = (a.vSeg && a.vSeg[k]) || vDef; if (cur != null) cur += dist / v * 60; }
+    if (pas[c]) cur = tMin(pas[c]);
+    return {c, nom:ptName(c), dist, k, v, eta:cur, reel:pas[c] || '', doute:SEG_DOUTE.includes(k)};
+  });
+  return {sens, vDef, rows};
+}
+const etaDe = (a, c) => { const r = etaTable(a).rows.find(x => x.c === c); return r && r.eta != null ? tFmt(r.eta) : ''; };
+function startAff(id) {
+  const a = DB.get('affectations', id); if (!a) return;
+  a.statut = 'route'; if (!a.hDepart) a.hDepart = hhmm(); if (!a.sens) a.sens = guessSens(a);
+  DB.put('affectations', a); toast(`Affectation démarrée · parti à ${a.hDepart}`); go('aff', {id}, {replace: stack[stack.length - 1].view === 'aff'});
+}
+function finishAff(id, btn) {
+  const a = DB.get('affectations', id); if (!a) return;
+  confirmInline(btn, `Terminer l'affectation ? Heure débarqué : ${a.hDebarque || hhmm()}`, () => {
+    if (!a.hDebarque) a.hDebarque = hhmm(); a.statut = 'fini'; DB.put('affectations', a);
+    const t = tempsTrajet(a); toast(`Débarqué à ${a.hDebarque}${t != null ? ' · trajet ' + dureeFmt(t) : ''}`); go('aff', {id}, {replace:true});
+  }, 'Oui, débarqué', true);
+}
+function openSheet(title, html, mount) {
+  const sh = $('#sheet');
+  sh.innerHTML = `<div class="sheet-bar"><button class="icon-btn" id="shClose" aria-label="Fermer">${ic('close')}</button><h2>${esc(title)}</h2></div><div class="sheet-body">${html}</div>`;
+  sh.hidden = false;
+  if (PWA) { try { history.pushState({sheet:1}, ''); sheetPushed = true; } catch (e) {} }
+  sh.onclick = e => { if (e.target.closest('#shClose')) closeSheet(true); };
+  if (mount) mount(sh);
+}
+function openAppel(type, id) {
+  const a = DB.get('affectations', id); if (!a) return;
+  const nav = DB.get('navires', a.navireId) || {};
+  const L = (k, v, txt) => `<div class="l"><span>${esc(k)}</span><b class="${txt ? 'txt' : ''}">${esc(v || '—')}</b></div>`;
+  const body = type === 'tracy'
+    ? L('TE AV', fmtM(a.teAv)) + L('TE AR', fmtM(a.teAr)) + L('Cargaison', [a.cargo, a.quantite].filter(Boolean).join(' · '), true)
+      + L('Contrecœur', a.hConq || etaDe(a, 'CONQ')) + L('Point 2', a.hPt2 || etaDe(a, 'CIP2'))
+    : L('Navire', nav.nom, true) + L('Départ', depNom(a), true) + L('Destination', destNom(a), true) + L('ETA', a.eta ? fmtDate(a.eta, true) : '')
+      + L('Mat. dang.', a.dg || 'aucune', true) + L('TE AV', fmtM(a.teAv)) + L('TE AR', fmtM(a.teAr)) + L('Tirant d\'air', fmtM(tirantAir(nav, a)));
+  openSheet(type === 'tracy' ? 'Appel à Tracy' : 'Appel de départ', `
+    <div class="readout big accent"><span class="k">Heure</span><span class="v" id="shClock">${hhmm()}</span></div>
+    <div class="call">${body}</div>
+    ${type === 'tracy' ? '<p class="sub">Heures prévues : calcul aux points d\'appel (distances à confirmer).</p>' : ''}`);
+}
+function navetteBtn(l) {
+  const tel = (l && l.navette) || NAVETTE_DEF.tel;
+  if (!tel) return '<button class="btn" data-notel="1">📞 Navette</button>';
+  return `<a class="btn" href="${esc(telHref(tel))}">📞 ${l && l.navette ? 'Navette' : 'Navette Ville-Marie'}</a>`;
+}
+function ancVerdictHTML(l, a, nav) {
+  if (!l || l.cat !== 'ancrage') return '';
+  const tm = teMax(a), tk = isTanker(nav.type), regle = tk ? 'pétrolier : TE max + 10 %' : 'TE max + 0,90 m';
+  if (tm == null || l.profondeur == null) return `<div class="verdict unk">Mouillage ${esc(l.nom)} : ${l.profondeur == null ? 'profondeur inconnue' : 'entrez le tirant d\'eau'}<small>Vérification impossible — à vérifier</small></div>`;
+  const need = profRequise(tm, tk);
+  return l.profondeur >= need
+    ? `<div class="verdict ok">✔ Mouillage ${esc(l.nom)} : OK<small>Profondeur ${fmtM(l.profondeur)} ≥ ${fmtM(need)} requis (${regle}) · au zéro des cartes, sans le niveau d'eau</small></div>`
+    : `<div class="verdict bad">✘ Dégagement sous quille insuffisant, à vérifier<small>${esc(l.nom)} : ${fmtM(l.profondeur)} < ${fmtM(need)} requis (${regle})</small></div>`;
+}
+function degagRows(ta, nivOf, liste = DEGAG) {
+  return liste.map(d => {
+    const nv = nivOf(d.st), has = nv != null, base = has ? (d.zc || 0) - nv : 0;
+    const m = r2(d.hl + base - ta), mg = d.gl != null ? r2(d.gl + base - ta) : null;
+    const bad = m < MARGE_MIN, warn = !bad && (!has || (mg != null && mg < MARGE_MIN));
+    const cls = bad ? 'bad' : warn ? 'unk' : 'ok', ic = bad ? '✘' : warn ? '⚠' : '✔';
+    const refTxt = d.ref ? ` au-dessus de la ${d.ref}` : ' au-dessus du zéro des cartes';
+    const nivTxt = has ? ` · niveau ${fmtNum(nv)} m (${d.st})` : ' · niveau d\'eau non entré : à confirmer';
+    return `<div class="verdict ${cls}"><span>${ic} ${esc(d.nom)} : marge ${fmtNum(m)} m${bad ? ' (moins de ' + MARGE_MIN + ' m)' : ''}<small>Hauteur libre ${fmtNum(d.hl)} m${refTxt}${d.gl != null ? ` (verglas ${fmtNum(d.gl)} m : marge ${fmtNum(mg)} m)` : ''}${nivTxt} · tirant d'air ${fmtNum(ta)} m${d.rem ? ' · ' + esc(d.rem) : ''} · ${ATL}, p. ${d.p}</small></span></div>`;
+  }).join('');
+}
+const DEGAG_NOTE = `<p class="reg">Tirant d'air = hauteur totale − tirant d'eau arrière. Marge minimale demandée : ${MARGE_MIN} m. Sans niveau d'eau, le résultat reste « à confirmer ». Trois-Rivières-Ouest et Laviolette sont mesurés depuis la PMSGM, à 3,1 m au-dessus du zéro des cartes (${ATL}, p. 94).<span class="src">Aide au calcul — vérifier sur la carte et dans l'ATL 112.</span></p>`;
+function degagHTML(a, ta) {
+  if (ta == null) return `<p class="empty">Entrez la hauteur totale du navire (pilot card) et le tirant d'eau arrière pour calculer le tirant d'air.</p>`;
+  return `<div class="stack">${degagRows(ta, st => a.niveaux ? a.niveaux[st] : null, degagDe(a))}</div>${DEGAG_NOTE}`;
+}
+// Photos (carte du pilote, ship particulars) : gardées dans le téléphone (IndexedDB), réduites à 1600 px.
+const PH = {
+  db: null,
+  open() { return this.db ? Promise.resolve(this.db) : new Promise((ok, ko) => { try { const r = indexedDB.open('propilot-photos', 1); r.onupgradeneeded = () => r.result.createObjectStore('p', {keyPath:'id'}); r.onsuccess = () => ok(this.db = r.result); r.onerror = () => ko(r.error); } catch (e) { ko(e); } }); },
+  tx(mode, fn) { return this.open().then(db => new Promise((ok, ko) => { const t = db.transaction('p', mode), q = fn(t.objectStore('p')); t.oncomplete = () => ok(q && q.result); t.onerror = () => ko(t.error); })); },
+  add(o) { return this.tx('readwrite', s => s.put(o)); },
+  del(id) { return this.tx('readwrite', s => s.delete(id)); },
+  list(navireId) { return this.tx('readonly', s => s.getAll()).then(all => (all || []).filter(x => x.navireId === navireId).sort((x, y) => (y.date || '').localeCompare(x.date || ''))); }
+};
+function shrink(file) {
+  return new Promise((ok, ko) => {
+    const img = new Image(), u = URL.createObjectURL(file);
+    img.onload = () => { const k = Math.min(1, 1600 / Math.max(img.width, img.height)), c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(u); ok(c.toDataURL('image/jpeg', 0.75)); };
+    img.onerror = () => { URL.revokeObjectURL(u); ko(new Error('image')); };
+    img.src = u;
+  });
+}
+function mountPhotos(r, navireId) {
+  const box = r.querySelector('#phs'); if (!box) return;
+  const draw = () => PH.list(navireId).then(l => {
+    box.innerHTML = l.map(p => `<button data-ph="${p.id}" aria-label="Voir la photo du ${esc(fmtDate(p.date))}"><img src="${p.src}" alt=""></button>`).join('') || '<p class="sub" style="grid-column:1/-1">Aucune photo.</p>';
+    box.querySelectorAll('[data-ph]').forEach(b => b.onclick = () => { const p = l.find(x => x.id === b.dataset.ph);
+      openSheet(`Photo · ${fmtDate(p.date)}`, `<img src="${p.src}" alt="Photo du navire" style="width:100%;border-radius:12px"><button class="btn danger block" id="phDel">Supprimer la photo</button>`,
+        sh => { const d = sh.querySelector('#phDel'); d.onclick = () => confirmInline(d, 'Supprimer cette photo ?', () => PH.del(p.id).then(() => { closeSheet(true); toast('Photo supprimée'); draw(); }), 'Supprimer'); }); });
+  }).catch(() => { box.innerHTML = '<p class="sub" style="grid-column:1/-1">Photos non disponibles dans ce navigateur.</p>'; });
+  r.querySelector('#phIn').onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    shrink(f).then(src => PH.add({id:uid(), navireId, src, date:nowLocal()})).then(() => { toast('Photo enregistrée'); draw(); })
+      .catch(() => toast('Photo impossible à enregistrer ici'));
+    e.target.value = '';
+  };
+  draw();
+}
+
+/* ---------- Écrans ---------- */
+const VIEWS = {
+  notFound: () => ({title:'Introuvable', html:`<p class="empty">Cette fiche n'existe plus.</p>`}),
+
+  home() {
+    const affs = DB.list('affectations');
+    const route = affs.filter(a => a.statut === 'route').sort(byDateDesc)[0];
+    const prep = affs.filter(a => a.statut === 'prep').sort(byDateDesc)[0];
+    const navN = a => a.navireId ? pickLabel('navires', a.navireId) : 'Navire ?';
+    let aff;
+    if (route) {
+      const rows = etaTable(route).rows;
+      let last = -1; rows.forEach((x, i) => { if (x.reel) last = i; });
+      const nx = last >= 0 ? rows[last + 1] : null;
+      const info = nx && nx.eta != null ? `Prochain : ${esc(nx.c)} ${tFmt(nx.eta)}` : `Parti à ${esc(route.hDepart || '—')}`;
+      aff = `<button class="hbtn live" data-go="aff" data-id="${route.id}"><small>Affectation active</small><span class="nm">${esc(navN(route))}</span><small>→ ${esc(destNom(route) || '?')}</small><small>${info}</small></button>`;
+    } else if (prep) {
+      aff = `<button class="hbtn prep" data-go="aff" data-id="${prep.id}"><small>En préparation</small><span class="nm">${esc(navN(prep))}</span><small>→ ${esc(destNom(prep) || '?')}</small><small>Ouvrir pour démarrer</small></button>`;
+    } else aff = `<button class="hbtn" data-go="affEdit">${ic('clip')}<span>Nouvelle affectation</span></button>`;
+    return {title:'ProPilot', html:`
+      <button class="searchbtn" data-go="search">${ic('search')}<span>Rechercher…</span></button>
+      <div class="hgrid">
+        ${aff}
+        <a class="hbtn" href="${NETPILOT}" target="_blank" rel="noopener">${ic('net')}<span>NetPilot</span></a>
+        <button class="hbtn" data-go="perso">${ic('lock')}<span>Perso</span></button>
+        ${TELS.lpa ? `<a class="hbtn" href="${esc(telHref(TELS.lpa))}">${ic('phone')}<span>LPA</span></a>` : `<button class="hbtn" data-notel="1">${ic('phone')}<span>LPA</span></button>`}
+        <button class="hbtn" data-go="apps">${ic('apps')}<span>APP</span></button>
+        <button class="hbtn" data-go="sites">${ic('globe')}<span>Site Web</span></button>
+      </div>`};
+  },
+
+  /* Notes personnelles */
+  perso({k = ''}) {
+    if (!persoOk()) return {title:'Perso', html:`
+      <label class="field"><span class="lbl">Code</span><input id="pCode" type="password" inputmode="numeric" autocomplete="off" aria-label="Code d'accès aux notes personnelles"></label>
+      <button class="btn primary block tall" id="pOk">Ouvrir</button>`,
+      mount: r => {
+        const i = r.querySelector('#pCode');
+        const ok = () => { if (hashCode(i.value.trim()) === PERSO_H) { persoUntil = Date.now() + 15 * 60000; go('perso', {k}, {replace:true}); } else { i.value = ''; toast('Code incorrect'); i.focus(); } };
+        r.querySelector('#pOk').onclick = ok; i.onkeydown = e => { if (e.key === 'Enter') ok(); }; setTimeout(() => i.focus(), 60);
+      }};
+    const NOMS = {man:'Expérience manœuvre', tug:'Idée remorqueur'};
+    if (!NOMS[k]) return {title:'Perso', html:`<div class="tiles">
+      <button class="tile" data-go="perso" data-k="man">${ic('quai')}<span>Expérience manœuvre<small>${pl(DB.d.perso.man.length, 'note', 'notes')}</small></span></button>
+      <button class="tile" data-go="perso" data-k="tug">${ic('tug')}<span>Idée remorqueur<small>${pl(DB.d.perso.tug.length, 'note', 'notes')}</small></span></button>
+      </div><p class="hint">Se reverrouille après 15 minutes.</p>`};
+    const L = [...DB.d.perso[k]].sort((a, b) => b.date.localeCompare(a.date));
+    return {title:NOMS[k], html:`
+      <textarea id="pTxt" placeholder="Écrire une note…" aria-label="Nouvelle note"></textarea>
+      <button class="btn primary block" id="pAdd">Ajouter</button>
+      <div class="stack">${L.map(n => `<div class="li"><span class="li-main"><span class="s">${fmtDate(n.date, true)}</span><span class="t" style="white-space:pre-wrap">${esc(n.txt)}</span></span><button class="icon-btn sm" data-pdel="${n.id}" aria-label="Supprimer la note">${ic('close')}</button></div>`).join('') || '<p class="empty">Aucune note.</p>'}</div>`,
+      mount: r => {
+        const rer = () => go('perso', {k}, {replace:true});
+        r.querySelector('#pAdd').onclick = () => { const v = r.querySelector('#pTxt').value.trim(); if (!v) return; DB.d.perso[k].push({id:uid(), date:nowLocal(), txt:v}); DB.save(); rer(); };
+        r.querySelectorAll('[data-pdel]').forEach(b => b.onclick = () => confirmInline(b, 'Supprimer cette note ?', () => { DB.d.perso[k] = DB.d.perso[k].filter(n => n.id !== b.dataset.pdel); DB.save(); rer(); }, 'Supprimer', true));
+      }};
+  },
+
+  /* Applications et sites */
+  apps() {
+    return {title:'Applications', html:`<div class="stack">${APPS.map(a => a.url
+      ? `<a class="li" href="${esc(a.url)}" target="_blank" rel="noopener">${ic('apps')}<span class="li-main"><span class="t">${esc(a.nom)}</span></span></a>`
+      : `<div class="li">${ic('apps')}<span class="li-main"><span class="t">${esc(a.nom)}</span><span class="s">Adresse à venir</span></span></div>`).join('')}</div>`};
+  },
+  sites() {
+    const L = DB.d.reglages.sites || [];
+    return {title:'Sites web', html:`
+      <div class="stack">${L.map((x, i) => `<div class="li"><a class="li-main" href="${esc(x.url)}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit"><span class="t">${esc(x.nom)}</span><span class="s">${esc(x.url)}</span></a><button class="icon-btn sm" data-sdel="${i}" aria-label="Retirer ${esc(x.nom)}">${ic('close')}</button></div>`).join('') || '<p class="empty">Aucun site pour l\'instant.</p>'}</div>
+      <input id="sNom" type="text" placeholder="Nom du site" aria-label="Nom du site" autocomplete="off">
+      <input id="sUrl" type="url" inputmode="url" placeholder="Adresse (https://…)" aria-label="Adresse du site" autocomplete="off">
+      <button class="btn primary block" id="sAdd">Ajouter</button>`,
+      mount: r => {
+        const rer = () => go('sites', {}, {replace:true});
+        r.querySelector('#sAdd').onclick = () => {
+          const nom = r.querySelector('#sNom').value.trim(); let url = r.querySelector('#sUrl').value.trim();
+          if (url && !/^[a-z][a-z0-9+.-]*:/i.test(url)) url = 'https://' + url;
+          if (!nom || !/^https?:\/\/[^\s]+$/i.test(url)) { toast('Entrez un nom et une adresse web'); return; }
+          DB.d.reglages.sites.push({nom, url}); DB.save(); rer();
+        };
+        r.querySelectorAll('[data-sdel]').forEach(b => b.onclick = () => { DB.d.reglages.sites.splice(+b.dataset.sdel, 1); DB.save(); rer(); });
+      }};
+  },
+
+  /* Quai / Rivière */
+  riviere() {
+    const nb = c => DB.list('lieux').filter(l => l.cat === c).length;
+    const qn = DB.list('lieux').filter(l => (l.cat === 'quai' || l.cat === 'lieu') && itemsFor({lieuId:l.id}).length).sort(byName);
+    return {title:'Rivière', html:`
+      <div class="tiles">
+        <button class="tile" data-go="lieux" data-cat="quai">${ic('quai')}<span>Quais<small>${pl(nb('quai'), 'fiche', 'fiches')} · par secteur</small></span></button>
+        <button class="tile" data-go="lieux" data-cat="ancrage">${ic('ancre')}<span>Mouillages<small>${nb('ancrage')} · profondeur et DSQ</small></span></button>
+        <button class="tile" data-go="degagements">${ic('bridge')}<span>Dégagements aériens<small>Ponts et câbles · ATL 112</small></span></button>
+        <button class="tile" data-go="lieux" data-cat="remorqueur">${ic('tug')}<span>Remorqueurs<small>Notes de tugs · lequel, quand</small></span></button>
+      </div>
+      <h2 class="h2">Mes notes de manœuvre par quai <span class="cnt">${qn.length}</span></h2>
+      <div class="stack">${qn.map(l => `<button class="li" data-go="lieu" data-id="${l.id}">${ic('quai')}<span class="li-main"><span class="t">${esc(l.nom)}</span><span class="s">${esc(regionOf(l))}</span></span><span class="li-side"><span class="n">${pl(itemsFor({lieuId:l.id}).length, 'note', 'notes')}</span></span></button>`).join('') || '<p class="empty">Aucune note de quai.</p>'}</div>`};
+  },
+  degagements({h = '', t = '', n = ''}) {
+    return {title:'Dégagements aériens', html:`
+      <p class="sub">Ponts et câbles de Trois-Rivières à Montréal, avec la Voie maritime et le Richelieu (${ATL}).</p>
+      <div class="grid2"><label class="field"><span class="lbl">Hauteur totale</span><span class="with-unit"><input id="dH" type="text" inputmode="decimal" value="${esc(h)}"><span>m</span></span></label>
+        <label class="field"><span class="lbl">TE arrière</span><span class="with-unit"><input id="dT" type="text" inputmode="decimal" value="${esc(t)}"><span>m</span></span></label></div>
+      <label class="field"><span class="lbl">Niveau d'eau (facultatif, même pour tous)</span><span class="with-unit"><input id="dN" type="text" inputmode="decimal" value="${esc(n)}"><span>m</span></span></label>
+      <div id="dRes" class="stack"></div>
+      <h2 class="h2">Hauteurs libres</h2>
+      <div class="stack">${DEGAG.map(d => `<div class="li"><span class="li-main"><span class="t">${esc(d.nom)}</span><span class="s">${d.gl != null ? `${fmtNum(d.gl)} m sous verglas · ` : ''}${d.ref ? 'depuis la ' + d.ref + ' · ' : ''}${d.rem ? esc(d.rem) + ' · ' : ''}station ${d.st} · ${ATL}, p. ${d.p}</span></span><span class="li-side"><span class="depth">${fmtNum(d.hl)} m</span></span></div>`).join('')}</div>
+      ${DEGAG_NOTE}`,
+      mount: r => {
+        const f = () => {
+          const H = parseNum(r.querySelector('#dH').value), T = parseNum(r.querySelector('#dT').value), N = parseNum(r.querySelector('#dN').value);
+          stack[stack.length - 1].params = {h:r.querySelector('#dH').value, t:r.querySelector('#dT').value, n:r.querySelector('#dN').value};
+          const out = r.querySelector('#dRes');
+          if (H == null || T == null || Number.isNaN(H) || Number.isNaN(T)) { out.innerHTML = '<p class="empty">Entrez la hauteur totale (pilot card) et le tirant d\'eau arrière.</p>'; return; }
+          const ta = r2(H - T);
+          out.innerHTML = `<div class="readout accent"><span class="k">Tirant d'air</span><span class="v">${fmtNum(ta)} m</span></div>` + degagRows(ta, () => (N == null || Number.isNaN(N)) ? null : N);
+        };
+        r.querySelectorAll('input').forEach(i => i.oninput = f); f();
+      }};
+  },
+
+  /* Référence */
+  reference() {
+    const DOCS = [['Quais et terminaux', 'Montréal, Montréal-Est, Contrecœur, Sorel-Tracy, Trois-Rivières / Bécancour'], ['Courants', 'Recueil 2017 et 60 cartes par secteur'],
+      ['Navigation', 'Livre de marques CPSLC, Livre radar, ATL 112 (2025)'], ['VN 301', 'Avis 27A, carte VN-301, post-Panamax, tableaux DSQ'],
+      ['Lois, règlements et procédures', 'Pilotage, Port de Montréal 2025, Voie maritime 2026, hiver'], ['Corporation CPSLC', 'Bulletins, règlement intérieur, politiques']];
+    return {title:'Référence', html:`
+      <div class="tiles">
+        <button class="tile" data-go="bottin">${ic('wheel')}<span>Bottin<small>${PILOTES.length} pilotes · navette</small></span></button>
+        <button class="tile" data-go="regles">${ic('note')}<span>Règles du port<small>DSQ, chenal, mouillages</small></span></button>
+        <button class="tile" data-go="degagements">${ic('bridge')}<span>Dégagements aériens<small>ATL 112</small></span></button>
+        <button class="tile" data-go="compteurs">${ic('count')}<span>Compteurs<small>Stretch et année</small></span></button>
+      </div>
+      <h2 class="h2">Documents de référence</h2>
+      <p class="info">Section à travailler plus tard : un résumé de chaque document, avec la page. Les originaux sont triés dans BIBLIOTHEQUE, sur l'ordinateur.</p>
+      <div class="stack">${DOCS.map(([t, d]) => `<div class="li"><span class="li-main"><span class="t">${esc(t)}</span><span class="s">${esc(d)}</span></span></div>`).join('')}</div>`};
+  },
+  regles() {
+    return {title:'Règles du port', html:`
+      ${regHTML({t:'<b>Approche du poste et le long du quai : DSQ de 0,3 m.</b> Quais 22 à 32 : <b>0,91 m</b>.', s:REG_SRC})}
+      ${regHTML({t:'Chenal : 11,3 m jusqu\'à M177 (quai 62) · <b>11,0 m de M177 à ISH</b> (quai 40) · <b>10,70 m d\'ISH à 12N</b>. Entre M177 et ISH, DSQ min. 0,61 m ; <b>sous 0,90 m : 4 nœuds max sur le fond et au moins un remorqueur</b>. En amont d\'ISH, enfoncement calculé à 9 nœuds.', s:REG_SRC})}
+      ${regHTML({t:'<b>Mouillage : DSQ pétrolier 10 % du TE max · autres navires 0,90 m.</b>', s:DSQ_MOU_SRC})}
+      <p class="sub">D'autres règles seront ajoutées en lisant les documents, toujours avec la source et la page.</p>`};
+  },
+
+  /* Navires */
+  navires() {
+    const list = [...DB.list('navires')].sort(byName);
+    const li = n => {
+      const u = usage('navire', n.id), al = itemsFor({navireId:n.id}).filter(x => prio(x) <= 1).length;
+      return `<button class="li" data-go="navire" data-id="${n.id}" data-name="${esc(norm(n.nom))}">${ic('ship')}<span class="li-main"><span class="t">${esc(n.nom)}</span><span class="s">${esc(subOf('navires', n))}</span></span>
+        <span class="li-side">${al ? `<span class="dotc t-neg" title="Négatifs et conseils">${al}</span>` : ''}<span class="n">${u.count}×</span></span></button>`;
+    };
+    return {title:'Navires', action:{label:'Nouveau', icon:'plus', fn:() => go('navireEdit')}, html:`
+      <input id="q" type="search" placeholder="Filtrer les navires" aria-label="Filtrer les navires" autocomplete="off">
+      <div class="stack" id="lst">${list.length ? list.map(li).join('') : '<p class="empty">Aucun navire. Touchez « Nouveau ».</p>'}</div>`,
+      mount: r => { r.querySelector('#q').oninput = e => { const Q = norm(e.target.value); r.querySelectorAll('#lst .li').forEach(b => b.hidden = !b.dataset.name.includes(Q)); }; }};
+  },
+  navire({id}) {
+    const n = DB.get('navires', id); if (!n) return VIEWS.notFound();
+    const u = usage('navire', id), items = itemsFor({navireId:id}).sort(sortBrief);
+    const rows = [
+      {k:'Longueur', v:fmtM(n.longueur)}, {k:'Largeur', v:fmtM(n.largeur)}, {k:'Creux', v:fmtM(n.creux)}, {k:'Hauteur totale', v:fmtM(n.hauteur)},
+      {k:'Gouvernail', v:n.gouvernail}, {k:'Recul', v:n.recul != null ? fmtNum(n.recul) + ' %' : ''},
+      {k:'Hélice', v:n.helice}, {k:'Rotation', v:n.rotation ? 'À ' + n.rotation : ''},
+      {k:'BT (étrave)', v:n.bt}, {k:'ST (poupe)', v:n.st}, {k:'Bittes (SWL)', v:n.swl != null && n.swl !== '' ? fmtNum(firstNum(n.swl)) + ' t' : ''}, {k:'Puissance', v:n.puissance},
+      {k:'Effet transversal', v:n.effetTransversal, full:true, txt:true}, {k:'Marche arrière', v:n.marcheArriere, full:true, txt:true},
+      {k:'Réponse à la barre', v:n.gouvNote, full:true, txt:true}, ...(n.notes ? [{k:'Particularités', v:n.notes, full:true, txt:true}] : [])
+    ];
+    return {title:n.nom, action:{label:'Modifier', icon:'edit', fn:() => go('navireEdit', {id})}, html:`
+      <div class="sub">${esc(n.type || 'Type non précisé')} · ${n.confirme ? `<span class="ok-t">Confirmé à bord le ${fmtDate(n.confirme)}</span>` : '<span class="warn-t">Données non confirmées à bord</span>'}</div>
+      <div class="readouts">
+        <div class="readout"><span class="k">Piloté</span><span class="v">${pad(u.count)}</span><span class="s">fois</span></div>
+        <div class="readout"><span class="k">Dernière fois</span><span class="v sm">${u.last ? fmtDate(u.last) : '—'}</span></div>
+      </div>
+      <div class="row"><button class="btn primary" data-go="noteEdit" data-navire-id="${id}">${ic('plus')} Note</button><button class="btn" data-go="manEdit" data-navire-id="${id}">${ic('plus')} Manœuvre</button></div>
+      <h2 class="h2">Notes et manœuvres <span class="cnt">${items.length}</span></h2>
+      ${items.length > 2 ? filtersHTML() : ''}
+      <div class="stack" id="items">${itemsBlock(items, {hideNavire:true}, 'Rien de noté sur ce navire pour l\'instant.')}</div>
+      <h2 class="h2">Caractéristiques</h2>${specsHTML(rows)}
+      ${u.list.length ? `<h2 class="h2">Voyages précédents <span class="cnt">${u.count}</span></h2><div class="stack">${u.list.slice(0, 20).map(affLi).join('')}</div>` : ''}
+      <h2 class="h2">Photos</h2><p class="sub">Carte du pilote, ship particulars… Gardées dans ce téléphone seulement (pas dans « Copier le texte »).</p>
+      <div class="photos" id="phs"></div><label class="btn block" for="phIn">📷 Prendre ou ajouter une photo</label><input class="vh" id="phIn" type="file" accept="image/*" capture="environment">`,
+      mount: r => { mountFilters(r); mountPhotos(r, id); }};
+  },
+  navireEdit({id}) {
+    const n = id ? DB.get('navires', id) : {};
+    if (id && !n) return VIEWS.notFound();
+    return {title:id ? 'Modifier le navire' : 'Nouveau navire', action:saveAction, html:formHTML(NAVIRE_F, n, !!id),
+      mount: r => mountForm(r, NAVIRE_F, {
+        delMsg:'Supprimer ce navire ? Les notes et affectations liées sont conservées.',
+        onSubmit: o => {
+          const dup = DB.list('navires').find(x => x.id !== id && norm(x.nom) === norm(o.nom));
+          if (dup) { toast('Ce navire existe déjà : voici sa fiche.'); go('navire', {id:dup.id}, {replace:true}); return; }
+          const s = DB.put('navires', {...n, ...o}); toast('Navire enregistré'); go('navire', {id:s.id}, {replace:true});
+        },
+        onDelete: () => { DB.del('navires', id); toast('Navire supprimé'); dropFromStack(id); }
+      })};
+  },
+
+  /* Quais, ancrages, remorqueurs, lieux */
+  lieux({cat = 'quai', reg = '', te = '', tk = '0'}) {
+    const isQ = cat === 'quai', isA = cat === 'ancrage';
+    let list = DB.list('lieux').filter(l => l.cat === cat).sort(byName);
+    if (isQ && reg) list = list.filter(l => regionOf(l) === reg);
+    const li = l => {
+      const al = itemsFor({lieuId:l.id}).filter(x => prio(x) <= 1).length, nb = itemsFor({lieuId:l.id}).length;
+      const side = isA ? (l.profondeur != null ? `<span class="depth">${fmtNum(l.profondeur)} m</span>` : '<span class="depth none">prof. ?</span>') + `<span class="mk" data-prof="${l.profondeur ?? ''}"></span>` : `<span class="n">${pl(nb, 'note', 'notes')}</span>`;
+      const sub = isA ? [/urgence/i.test(l.nom + ' ' + (l.notes || '')) ? 'URGENCE' : '', l.duree, l.restrictions].filter(Boolean).join(' · ') : (isQ ? [regionOf(l), l.profondeur != null ? fmtM(l.profondeur) : ''].filter(Boolean).join(' · ') : (l.secteur || CAT[l.cat]));
+      return `<button class="li" data-go="lieu" data-id="${l.id}" data-name="${esc(norm(l.nom + ' ' + (l.secteur || '')))}">${ic(CAT_IC[l.cat])}<span class="li-main"><span class="t">${esc(l.nom)}</span><span class="s">${esc(sub)}</span></span>
+        <span class="li-side">${al ? `<span class="dotc t-neg">${al}</span>` : ''}${side}</span></button>`;
+    };
+    const body = isA
+      ? MGROUPES.map(g => { const it = list.filter(l => groupeMouillage(l) === g); return it.length ? `<h3 class="grp" data-grp>${esc(g)} <span class="cnt">${it.length}</span></h3>${it.map(li).join('')}` : ''; }).join('')
+      : list.map(li).join('');
+    return {title:CAT_PL[cat], action:{label:'Nouveau', icon:'plus', fn:() => go('lieuEdit', {cat})}, html:`
+      <div class="scroller">${Object.keys(CAT).map(c => `<button class="btn ${c === cat ? 'primary' : ''}" data-go="lieux" data-cat="${c}" data-replace="1">${esc(CAT_PL[c])}</button>`).join('')}</div>
+      ${isQ ? `<div class="filters" role="group" aria-label="Secteur">${['', ...REGIONS].map(r => `<button class="fchip" data-go="lieux" data-cat="quai" data-reg="${esc(r)}" data-replace="1" aria-pressed="${r === reg}">${esc(r || 'Tous')}</button>`).join('')}</div>` : ''}
+      ${isA ? `<div class="dsqbox"><b>DSQ au mouillage : pétrolier 10 % du TE max · autres navires 0,90 m</b>
+        <div class="grid2"><span class="with-unit"><input id="aTe" type="text" inputmode="decimal" placeholder="TE max" value="${esc(te)}" aria-label="Tirant d'eau maximal"><span>m</span></span>
+        <div class="seg">${[['0', 'Autre'], ['1', 'Pétrolier']].map(([v, l]) => `<label class="seg-opt"><input type="radio" name="atk" value="${v}"${tk === v ? ' checked' : ''}><span>${l}</span></label>`).join('')}</div></div>
+        <span class="sub" id="aNeed">Entrez le TE pour voir les mouillages permis.</span><span class="hint">${esc(DSQ_MOU_SRC)} · profondeurs au zéro des cartes</span></div>` : ''}
+      <input id="q" type="search" placeholder="Filtrer" aria-label="Filtrer la liste" autocomplete="off">
+      <div class="stack" id="lst">${body || `<p class="empty">Aucune fiche. Touchez « Nouveau ».</p>`}</div>`,
+      mount: r => {
+        r.querySelector('#q').oninput = e => { const Q = norm(e.target.value); r.querySelectorAll('#lst .li').forEach(b => b.hidden = !b.dataset.name.includes(Q)); };
+        if (!isA) return;
+        const upd = () => {
+          const t = parseNum(r.querySelector('#aTe').value), k = r.querySelector('input[name="atk"]:checked')?.value || '0';
+          stack[stack.length - 1].params = {cat, te:r.querySelector('#aTe').value, tk:k};
+          const ok = t != null && !Number.isNaN(t), need = ok ? profRequise(t, k === '1') : null;
+          r.querySelector('#aNeed').innerHTML = ok ? `Profondeur requise : <b>${fmtNum(need)} m</b> (${k === '1' ? 'TE + 10 %' : 'TE + 0,90 m'})` : 'Entrez le TE pour voir les mouillages permis.';
+          r.querySelectorAll('.mk').forEach(m => { const p = m.dataset.prof === '' ? null : Number(m.dataset.prof), li = m.closest('.li');
+            li.classList.toggle('okd', ok && p != null && p >= need); li.classList.toggle('bad', ok && p != null && p < need);
+            m.textContent = !ok ? '' : p == null ? ' ?' : p >= need ? ' ✔' : ' ✘'; });
+        };
+        r.querySelector('#aTe').oninput = upd; r.querySelectorAll('input[name="atk"]').forEach(i => i.onchange = upd); upd();
+      }};
+  },
+  lieu({id}) {
+    const l = DB.get('lieux', id); if (!l) return VIEWS.notFound();
+    const items = itemsFor({lieuId:id}).sort(sortBrief), u = usage('lieu', id);
+    const rows = [{k:'Secteur', v:l.secteur}];
+    if (l.cat === 'quai' || l.cat === 'ancrage') rows.push({k:'Profondeur réf.', v:fmtM(l.profondeur)}, {k:'Réf. verticale', v:l.refVert});
+    if (l.cat === 'quai') rows.push({k:'Secteur (liste)', v:regionOf(l)}, {k:'Station niveau d\'eau', v:l.station}, {k:'Angle', v:l.angle}, {k:'Hauteur', v:fmtM(l.hauteur)}, {k:'Navette', v:l.navette || (NAVETTE_DEF.tel ? `${NAVETTE_DEF.tel} (Ville-Marie, par défaut)` : 'À importer avec la sauvegarde')});
+    if (l.cat === 'quai' && l.procedure) rows.push({k:'Procédure d\'approche / de départ', v:l.procedure, full:true, txt:true});
+    if (l.cat === 'ancrage') rows.push({k:'Dimensions', v:l.dimensions}, {k:'Durée (pétr. / autres)', v:l.duree}, {k:'Restrictions', v:l.restrictions, full:true, txt:true}, {k:'Fond / tenue', v:l.fond, full:true, txt:true});
+    if (l.cat === 'remorqueur') rows.push({k:'Compagnie', v:l.compagnie}, {k:'Traction', v:l.traction ? l.traction + (/t/i.test(l.traction) ? '' : ' t') : ''});
+    rows.push({k:'Vérifié le', v:l.verifie ? fmtDate(l.verifie) : ''});
+    if (l.notes) rows.push({k:'Notes', v:l.notes, full:true, txt:true});
+    if (l.source) rows.push({k:'Source', v:l.source, full:true, txt:true});
+    const anc = l.cat === 'ancrage' ? `
+      <div class="readout big accent"><span class="k">Profondeur</span><span class="v">${l.profondeur != null ? fmtNum(l.profondeur) + ' m' : '?'}</span><span class="s">${esc(l.dimensions || '')}${l.duree ? ' · ' + esc(l.duree) : ''}</span></div>
+      <p class="reg">📘 <b>DSQ au mouillage : pétrolier 10 % du TE max · autres navires 0,90 m.</b><span class="src">${esc(DSQ_MOU_SRC)} · note automatique</span></p>
+      <div class="addrow"><input id="ancTe" type="text" inputmode="decimal" placeholder="TE m" aria-label="Tirant d'eau maximal"><span id="ancRes" class="sub" style="align-self:center">Entrez le TE max pour vérifier.</span></div>` : '';
+    return {title:l.nom, action:{label:'Modifier', icon:'edit', fn:() => go('lieuEdit', {id})}, mount: r => {
+        mountFilters(r);
+        const te = r.querySelector('#ancTe'); if (!te) return;
+        te.oninput = () => { const t = parseNum(te.value), out = r.querySelector('#ancRes');
+          if (t == null || Number.isNaN(t)) { out.textContent = 'Entrez le TE max pour vérifier.'; return; }
+          const pr = l.profondeur, need = [['Pétrolier', profRequise(t, true)], ['Autres', profRequise(t, false)]];
+          out.innerHTML = need.map(([n, v]) => `${n} : ${fmtNum(v)} m requis ${pr == null ? '' : pr >= v ? '<span class="ok-t">✔</span>' : '<span class="warn-t">✘ trop peu d\'eau</span>'}`).join('<br>'); };
+      }, html:`
+      <div class="sub">${esc(CAT[l.cat])}${l.cat !== 'remorqueur' ? ` · ${u.count} affectation${u.count > 1 ? 's' : ''}` : ''}</div>${anc}${l.cat === 'quai' ? `<div class="row">${navetteBtn(l)}</div>` : ''}
+      <div class="row"><button class="btn primary" data-go="noteEdit" data-lieu-id="${id}">${ic('plus')} Note</button>${l.cat !== 'remorqueur' ? `<button class="btn" data-go="manEdit" data-lieu-id="${id}">${ic('plus')} Manœuvre</button>` : ''}</div>
+      <h2 class="h2">Notes et manœuvres <span class="cnt">${items.length}</span></h2>
+      ${items.length > 2 ? filtersHTML() : ''}
+      <div class="stack" id="items">${itemsBlock(items, {hideLieu:true}, 'Rien de noté ici pour l\'instant.')}</div>
+      <h2 class="h2">Fiche</h2>${specsHTML(rows)}`};
+  },
+  lieuEdit({id, cat}) {
+    const l = id ? DB.get('lieux', id) : {cat: cat || 'quai'};
+    if (id && !l) return VIEWS.notFound();
+    return {title:id ? 'Modifier la fiche' : 'Nouvelle fiche', action:saveAction, html:formHTML(LIEU_F, l, !!id),
+      mount: r => mountForm(r, LIEU_F, {
+        delMsg:'Supprimer cette fiche ? Les notes liées sont conservées.',
+        onSubmit: o => { const s = DB.put('lieux', {...l, ...o, cat:o.cat || 'quai'}); toast('Fiche enregistrée'); go('lieu', {id:s.id}, {replace:true}); },
+        onDelete: () => { DB.del('lieux', id); toast('Fiche supprimée'); dropFromStack(id); }
+      })};
+  },
+
+  /* Notes et manœuvres */
+  noteEdit({id, navireId, lieuId, affId, texte, date}) {
+    const a = DB.get('affectations', affId);
+    const n = id ? DB.get('notes', id) : {kind:'note', ton:texte ? 'info' : undefined, texte:texte || '', source:'moi', date:date || nowLocal(), navireId: navireId || a?.navireId || null, lieuId: lieuId || null, affectationId: affId || null};
+    if (id && !n) return VIEWS.notFound();
+    return {title:id ? 'Modifier la note' : 'Nouvelle note', action:saveAction, html:formHTML(NOTE_F, n, !!id),
+      mount: r => mountForm(r, NOTE_F, {
+        validate: o => (!o.navireId && !o.lieuId) ? 'Rattachez la note à un navire ou à un lieu.' : null,
+        onSubmit: o => { DB.put('notes', {...n, ...o}); toast('Note enregistrée'); back(); },
+        onDelete: () => { DB.del('notes', id); toast('Note supprimée'); back(); }
+      })};
+  },
+  manEdit({id, affId, navireId, lieuId}) {
+    const a = DB.get('affectations', affId);
+    const n = id ? DB.get('notes', id) : {kind:'manoeuvre', mtype:'accostage', cote:'', date:nowLocal(), affectationId:affId || null,
+      navireId: navireId || a?.navireId || null, lieuId: lieuId || a?.destId || null, tirantEau: a ? (a.teAr ?? a.teAv ?? null) : null};
+    if (id && !n) return VIEWS.notFound();
+    return {title:id ? 'Modifier la manœuvre' : 'Compte rendu de manœuvre', action:saveAction, html:formHTML(MAN_F, n, !!id),
+      mount: r => mountForm(r, MAN_F, {
+        onSubmit: o => { DB.put('notes', {...n, ...o}); toast('Manœuvre enregistrée'); back(); },
+        onDelete: () => { DB.del('notes', id); toast('Manœuvre supprimée'); back(); }
+      })};
+  },
+
+  /* Affectations */
+  affectations({an = 'cette', tri = 'date', q = ''}) {
+    const y = +curYear();
+    const nomN = a => a.navireId ? pickLabel('navires', a.navireId) : '';
+    const cmpTxt = f => (a, b) => f(a).localeCompare(f(b), 'fr', {sensitivity:'base'}) || byDateDesc(a, b);
+    const cmp = {date:byDateDesc, ancien:(a, b) => -byDateDesc(a, b), nom:cmpTxt(nomN), depart:cmpTxt(depNom), dest:cmpTxt(destNom)}[tri] || byDateDesc;
+    const list = DB.list('affectations').filter(a => an === 'toutes' || (a.date || '').startsWith(String(an === 'cette' ? y : y - 1))).sort(cmp);
+    const chip = (v, l) => `<button class="fchip" data-go="affectations" data-an="${v}" data-tri="${tri}" data-replace="1" aria-pressed="${an === v}">${l}</button>`;
+    return {title:'Mes fiches', action:{label:'Nouvelle', icon:'plus', fn:() => go('affEdit')}, html:`
+      <div class="filters" role="group" aria-label="Année">${chip('cette', 'Cette année')}${chip('passee', 'L\'an passé')}${chip('toutes', 'Toutes')}</div>
+      <div class="toolbar"><input id="q" type="search" value="${esc(q)}" placeholder="Nom du navire" aria-label="Filtrer par navire" autocomplete="off">
+        <select id="tri" aria-label="Trier" style="width:auto">${[['date', 'Plus récentes'], ['ancien', 'Plus anciennes'], ['nom', 'Nom du navire'], ['depart', 'Lieu de départ'], ['dest', 'Destination']].map(([v, l]) => `<option value="${v}"${v === tri ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
+      <p class="sub" id="nb">${pl(list.length, 'fiche', 'fiches')}</p>
+      <div class="stack" id="lst">${list.length ? list.map(affLi).join('') : '<p class="empty">Aucune fiche pour cette période.</p>'}</div>`,
+      mount: r => {
+        const f = () => { const Q = norm(r.querySelector('#q').value); stack[stack.length - 1].params = {an, tri, q:r.querySelector('#q').value};
+          r.querySelectorAll('#lst .li').forEach(b => b.hidden = !b.dataset.name.includes(Q)); };
+        r.querySelector('#q').oninput = f; f();
+        r.querySelector('#tri').onchange = e => go('affectations', {an, tri:e.target.value, q:r.querySelector('#q').value}, {replace:true});
+      }};
+  },
+  affEdit({id, navireId}) {
+    const a = id ? DB.get('affectations', id) : {date:nowLocal(), navireId:navireId || null, statut:'prep', stretchId:currentStretch()?.id || ''};
+    if (id && !a) return VIEWS.notFound();
+    const nav = DB.get('navires', a.navireId) || {};
+    const vals = {...a, depart:{autre:a.departAutre, id:a.departId, txt:a.departTxt}, dest:{autre:a.destAutre || a.destMode === 'mer', id:a.destId, txt:a.destTxt}};
+    NAV_KEYS.forEach(k => vals['n_' + k] = nav[k]);
+    if (vals.n_stOn == null && nav.st) vals.n_stOn = true;
+    return {title:id ? 'Modifier la fiche' : 'Nouvelle affectation', action:saveAction, html:formHTML(AFF_F, vals, !!id),
+      mount: r => {
+        mountForm(r, AFF_F, {
+          delMsg:'Supprimer cette fiche ? Les compteurs seront recalculés.',
+          onPick: (k, pid, form) => {
+            if (k !== 'navireId' || !pid) return;
+            const n = DB.get('navires', pid) || {};
+            NAV_KEYS.forEach(key => { const el = form.querySelector('#f_n_' + key); if (!el) return;
+              if (el.type === 'checkbox') { el.checked = !!(n[key] ?? n.st); return; }
+              const val = n[key] == null ? '' : String(n[key]).replace('.', ',');
+              if (el.tagName === 'SELECT' && val && ![...el.options].some(o => o.value === val)) el.add(new Option(val, val));
+              el.value = val; });
+            if (n.dernierTeAv != null && !form.querySelector('#f_teAv').value) form.querySelector('#f_teAv').value = String(n.dernierTeAv).replace('.', ',');
+            if (n.dernierTeAr != null && !form.querySelector('#f_teAr').value) form.querySelector('#f_teAr').value = String(n.dernierTeAr).replace('.', ',');
+            form.dispatchEvent(new Event('change')); fTA();
+            const nb = itemsFor({navireId:pid}).length, u = usage('navire', pid);
+            if (nb || u.count) toast(`${u.count ? `Déjà piloté ${u.count} fois` : ''}${u.count && nb ? ' · ' : ''}${nb ? `${nb} note${nb > 1 ? 's' : ''} : voir « Notes de manœuvre »` : ''}`);
+          },
+          onSubmit: o => {
+            const navUpd = {}; NAV_KEYS.forEach(k => { const v = o['n_' + k]; delete o['n_' + k]; if (v !== '' && v != null) navUpd[k] = v; });
+            const n = DB.get('navires', o.navireId);
+            if (n) DB.put('navires', {...n, ...navUpd, ...(o.teAv != null ? {dernierTeAv:o.teAv} : {}), ...(o.teAr != null ? {dernierTeAr:o.teAr} : {})});
+            if (o.cargo && !liste('cargo').some(c => norm(c) === norm(o.cargo))) { DB.d.reglages.listes.cargo.push(o.cargo); }
+            const s = DB.put('affectations', {...a, ...o, destMode:null});
+            const k = ranks(s);
+            toast(`${id ? 'Fiche enregistrée' : 'Affectation préparée'} · ${k.sr != null ? `n° ${k.sr} du stretch · ` : ''}n° ${k.yr} de ${k.y}`);
+            go('aff', {id:s.id}, {replace:true});
+          },
+          onDelete: () => { DB.del('affectations', id); toast('Fiche supprimée'); dropFromStack(id); }
+        });
+        const fTA = () => {
+          const g = k => parseNum(r.querySelector('#f_' + k).value), h = g('n_hauteur'), t = g('teAr');
+          const el = r.querySelector('#calc_ta');
+          if (h == null || Number.isNaN(h) || t == null || Number.isNaN(t)) { el.className = 'verdict unk'; el.innerHTML = 'Tirant d\'air : entrez la hauteur totale et le TE arrière'; return; }
+          el.className = 'verdict';
+          el.innerHTML = `Tirant d'air : ${fmtNum(r2(h - t))} m<small>Hauteur ${fmtNum(h)} − TE arrière ${fmtNum(t)} m · ponts et câbles du trajet : voir la fiche enregistrée</small>`;
+        };
+        r.querySelector('#frm').addEventListener('input', fTA); fTA();
+      }};
+  },
+  aff({id}) {
+    const a = DB.get('affectations', id); if (!a) return VIEWS.notFound();
+    const k = ranks(a), nav = DB.get('navires', a.navireId) || {};
+    const dest = destLieu(a);
+    const al = new Set([...itemsFor({navireId:a.navireId}), ...itemsFor({lieuId:a.departId}), ...itemsFor({lieuId:a.destId})].filter(x => prio(x) <= 1)).size;
+    const mans = DB.list('notes').filter(n => n.affectationId === id).sort(byDateDesc);
+    const tm = teMax(a), typ = isPC(nav.type) ? 'pc' : 'au', ta = tirantAir(nav, a), traj = tempsTrajet(a), st = a.statut || 'fini';
+    const tugs = [['Avant', a.tugAvId], ['Arrière', a.tugArId]].filter(x => x[1]);
+    const journal = [...(a.journal || [])].sort((x, y) => (x.h || '').localeCompare(y.h || ''));
+    const pil = PILOTES.map(p => `<option value="${esc(p.code)} — ${esc(p.prenom)} ${esc(p.nom)}">`).join('');
+    const KV = (kk, v) => v == null || v === '' ? '' : `<span><i>${esc(kk)}</i><b>${esc(v)}</b></span>`;
+    const KT = (kk, v) => v ? `<span class="wrap"><i>${esc(kk)}</i>${esc(v)}</span>` : '';
+    const pas = a.passages || {}, pasTxt = Object.keys(pas).map(c => KV(c, pas[c])).join('');
+    const ST = {prep:'En préparation', route:'En route', fini:'Terminée'};
+    const acts = st === 'prep'
+      ? `<button class="btn primary block tall" data-start="${id}">▶ Démarrer l'affectation</button>`
+      : st === 'route'
+        ? `<div class="row"><button class="btn primary tall" data-appel="depart" data-id="${id}">📻 Appel de départ</button><button class="btn tall" data-go="heures" data-id="${id}">⏱ Heures aux points</button></div>
+          ${versLambert(a) ? `<button class="btn block" data-appel="tracy" data-id="${id}">📻 Appel à Tracy (Voie maritime)</button>` : ''}
+          <div class="row">${navetteBtn(dest)}<button class="btn" data-finish="${id}">⚓ Débarqué</button></div>`
+        : `<div class="row"><button class="btn" data-go="heures" data-id="${id}">⏱ Heures aux points</button><button class="btn" data-appel="depart" data-id="${id}">📻 Résumé</button></div>`;
+    return {title:nav.nom || 'Fiche navire', action:{label:'Modifier', icon:'edit', fn:() => go('affEdit', {id})}, html:`
+      <div class="sub"><b>${ST[st]}</b> · ${k.sr != null ? `n° ${k.sr} du stretch · ` : ''}n° ${k.yr} de ${k.y}${traj != null ? ` · trajet <b>${dureeFmt(traj)}</b>` : ''}</div>
+      ${acts}
+      <button class="btn block" data-go="briefing" data-aff-id="${id}">${ic('eye')} Notes de manœuvre${al ? ` · ${al} alerte${al > 1 ? 's' : ''}` : ''}</button>
+      ${reglesFiche(a, nav, dest).map(regHTML).join('')}
+      ${ancVerdictHTML(dest, a, nav)}
+      ${a.teAv != null && a.teAr != null && a.teAv > a.teAr ? `<div class="verdict bad">⚠ Navire sur le nez : TE AV ${fmtM(a.teAv)} > TE AR ${fmtM(a.teAr)}</div>` : ''}
+      <div class="rpt"><h3>Navire — fixe</h3><div class="kv">${KV('L', fmtM(nav.longueur))}${KV('B', fmtM(nav.largeur))}${KV('Creux', fmtM(nav.creux))}${KV('Haut.', fmtM(nav.hauteur))}
+        ${KV('Type', nav.type)}${KV('BT', nav.bt)}${KV('ST', nav.stOn || nav.st ? (nav.st || 'oui') : '')}${KV('Recul', nav.recul != null ? fmtNum(nav.recul) + ' %' : '')}
+        ${KV('Bittes', nav.swl != null && nav.swl !== '' ? fmtNum(firstNum(nav.swl)) + ' t' : '')}${KV('Gouv.', nav.gouvernail)}</div></div>
+      <div class="rpt"><h3>Voyage</h3><div class="kv">${KT('De', depNom(a))}${KT('Vers', destNom(a))}${KV('ETA', a.eta ? fmtDate(a.eta, true) : '')}
+        ${KT('Cargo', [a.cargo, a.quantite].filter(Boolean).join(' · '))}${KT('DG', a.dg)}${KV('TE AV', fmtM(a.teAv))}${KV('TE AR', fmtM(a.teAr))}${KV('T. d\'air', fmtM(ta))}
+        ${KT('Agent', a.agent)}${KT('Météo', a.meteo)}</div></div>
+      <div class="rpt"><h3>Temps</h3><div class="kv">${KV('Affecté', fmtDate(a.date, true))}${KV('Parti', a.hDepart)}${KV('Débarqué', a.hDebarque)}${KV('Trajet', traj != null ? dureeFmt(traj) : '')}
+        ${KV('Tugs', a.hTugs)}${KV('Linesmen', a.hLines)}${a.releve ? KV('Relève', a.hReleve || 'oui') : ''}${pasTxt}</div></div>
+      <h2 class="sec">Remorqueurs et bittes</h2>
+      ${tugs.length ? tugs.map(([pos, tid]) => tugHTML(pos, DB.get('lieux', tid), nav)).join('') : '<p class="empty">Aucun remorqueur choisi.</p>'}
+      <h2 class="sec">Niveaux d'eau, DSQ et vitesse permise</h2>
+      <p class="sub">TE retenu : <b>${tm != null ? fmtM(tm) : '—'}</b> (le plus grand) · Largeur ${fmtM(nav.largeur) || '—'} · Tableau ${typ === 'pc' ? 'porte-conteneurs' : 'autres navires'}</p>
+      <div class="st-table" id="stTable">${STATIONS.map(([c, nm]) => `<div class="st-row"><span class="n">${esc(nm)}</span>
+        <input data-st="${c}" type="text" inputmode="decimal" placeholder="niv. m" aria-label="Niveau d'eau ${esc(nm)}" value="${a.niveaux && a.niveaux[c] != null ? esc(String(a.niveaux[c]).replace('.', ',')) : ''}">
+        <span class="r" id="res_${c}"></span></div>`).join('')}</div>
+      <div id="dsqQuai"></div>
+      <p class="reg">Chenal : ${fmtNum(CHENAL)} m jusqu'à M177. DSQ = chenal + niveau − TE. Vitesse permise : ligne de largeur supérieure, sans interpolation. Tableaux DSQ 2013 (Avis 27C), à vérifier contre l'officiel.<span class="src">Aide au calcul — le pilote décide, les SCTM/VTS ont priorité.</span></p>
+      <h2 class="sec">Dégagements aériens</h2>
+      <div id="degag">${degagHTML(a, ta)}</div>
+      <h2 class="sec">Rencontre (post-Panamax)</h2>
+      <div class="stack">${(a.rencontres || []).map(rc => rencHTML(rc, nav)).join('') || '<p class="empty">Aucune rencontre notée.</p>'}</div>
+      <details><summary class="btn block">${ic('plus', 'sm')} Ajouter une rencontre</summary>
+        <div class="form" style="margin-top:10px">
+          <input id="rcNom" type="text" placeholder="Autre navire" autocomplete="off">
+          <div class="grid2"><input id="rcLong" type="text" inputmode="decimal" placeholder="Longueur m"><input id="rcLarg" type="text" inputmode="decimal" placeholder="Largeur m"></div>
+          <input id="rcP1" list="dlPil" placeholder="Pilote 1 (code ou nom)" autocomplete="off"><input id="rcP2" list="dlPil" placeholder="Pilote 2 (code ou nom)" autocomplete="off">
+          <datalist id="dlPil">${pil}</datalist>
+          <button class="btn primary block" id="rcAdd">Enregistrer la rencontre</button></div></details>
+      <h2 class="sec">Journal d'événements <span class="cnt">${journal.length}</span></h2>
+      <div class="stack">${journal.map(e => `<div class="ev"><time>${esc(e.h)}</time><span>${esc(e.texte)}</span>
+        <span><button class="btn" data-evcopy="${e.id}" title="Copier en note de manœuvre">→ Note</button> <button class="icon-btn sm" data-evdel="${e.id}" aria-label="Supprimer">${ic('close')}</button></span></div>`).join('') || '<p class="empty">Ex. « remorqueurs arrivés », « amarre brisée ».</p>'}</div>
+      <div class="addrow"><span class="timef" style="grid-template-columns:1fr"><input id="evH" type="text" inputmode="numeric" value="${hhmm()}" aria-label="Heure"></span><input id="evT" type="text" placeholder="Événement…" aria-label="Texte de l'événement"></div>
+      <button class="btn primary block" id="evAdd">${ic('plus', 'sm')} Événement</button>
+      <h2 class="h2">Manœuvres et notes <span class="cnt">${mans.length}</span></h2>
+      <div class="row"><button class="btn primary" data-go="manEdit" data-aff-id="${id}">${ic('plus')} Manœuvre</button><button class="btn" data-go="noteEdit" data-aff-id="${id}">${ic('plus')} Note</button></div>
+      <div class="stack">${itemsBlock(mans, {hideNavire:true}, 'Après la manœuvre, notez ici ce qui a bien ou moins bien marché.')}</div>`,
+      mount: r => {
+        const save = () => DB.put('affectations', a);
+        const recalc = () => {
+          for (const [c] of STATIONS) {
+            const nv = a.niveaux ? a.niveaux[c] : null, out = r.querySelector('#res_' + c);
+            if (nv == null || tm == null) { out.innerHTML = tm == null ? 'TE ?' : ''; continue; }
+            const dsq = CHENAL + nv - tm, vp = vitessePermise(typ, nav.largeur, dsq);
+            out.innerHTML = `DSQ <b>${fmtNum(Math.round(dsq * 100) / 100)}</b> m<br>${vp.v != null ? `<span class="ok-t">≤ ${vp.v} nœuds</span>` : `<span class="warn-t">${esc(vp.msg)}</span>`}`;
+          }
+          r.querySelector('#dsqQuai').innerHTML = dsqQuaiHTML(a, dest, tm);
+          r.querySelector('#degag').innerHTML = degagHTML(a, ta);
+        };
+        r.querySelectorAll('[data-st]').forEach(inp => inp.onchange = () => {
+          const v = parseNum(inp.value); a.niveaux = a.niveaux || {};
+          if (v == null) delete a.niveaux[inp.dataset.st]; else if (Number.isNaN(v)) { toast('Niveau invalide (ex. 0,35 ou -0,20)'); return; } else a.niveaux[inp.dataset.st] = v;
+          a.niveauxH = nowLocal(); save(); recalc();
+        });
+        recalc();
+        r.querySelector('#evAdd').onclick = () => {
+          const h = parseTime(r.querySelector('#evH').value), t = r.querySelector('#evT').value.trim();
+          if (h === null || !h) { toast('Heure invalide (ex. 0630)'); return; } if (!t) { toast('Écrivez l\'événement'); return; }
+          a.journal = [...(a.journal || []), {id:uid(), h, texte:t}]; save(); go('aff', {id}, {replace:true});
+        };
+        r.querySelectorAll('[data-evdel]').forEach(b => b.onclick = () => confirmInline(b, 'Supprimer cet événement ?', () => { a.journal = a.journal.filter(e => e.id !== b.dataset.evdel); save(); go('aff', {id}, {replace:true}); }, 'Supprimer'));
+        r.querySelectorAll('[data-evcopy]').forEach(b => b.onclick = () => {
+          const e = a.journal.find(x => x.id === b.dataset.evcopy);
+          go('noteEdit', {navireId:a.navireId, lieuId:dest ? dest.id : null, affId:id, texte:`${e.h} — ${e.texte}`, date:a.date.slice(0, 11) + e.h});
+        });
+        r.querySelector('#rcAdd').onclick = () => {
+          const g = s => r.querySelector(s).value.trim();
+          const rc = {id:uid(), nom:g('#rcNom'), long:parseNum(g('#rcLong')), larg:parseNum(g('#rcLarg')), p1:g('#rcP1'), p2:g('#rcP2')};
+          if (Number.isNaN(rc.long) || Number.isNaN(rc.larg)) { toast('Longueur ou largeur invalide'); return; }
+          a.rencontres = [...(a.rencontres || []), rc]; save(); go('aff', {id}, {replace:true});
+        };
+        r.querySelectorAll('[data-rcdel]').forEach(b => b.onclick = () => confirmInline(b, 'Supprimer cette rencontre ?', () => { a.rencontres = a.rencontres.filter(x => x.id !== b.dataset.rcdel); save(); go('aff', {id}, {replace:true}); }, 'Supprimer'));
+      }};
+  },
+  heures({id}) {
+    const a = DB.get('affectations', id); if (!a) return VIEWS.notFound();
+    const T = etaTable(a);
+    return {title:'Heures aux points', html:`
+      <div class="sub">${esc(a.navireId ? pickLabel('navires', a.navireId) : '')} · parti à <b>${esc(a.hDepart || '—')}</b>${a.hDepart ? '' : ' (entrez l\'heure de départ dans la fiche)'}</div>
+      <div class="seg">${[['montant', 'Montant'], ['descendant', 'Descendant']].map(([v, l]) => `<label class="seg-opt"><input type="radio" name="hsens" value="${v}"${T.sens === v ? ' checked' : ''}><span>${l}</span></label>`).join('')}</div>
+      <div class="grid2"><label class="field"><span class="lbl">Vitesse partout</span><span class="with-unit"><input id="hv" type="text" inputmode="decimal" value="${fmtNum(T.vDef)}"><span>nd</span></span></label>
+        <div class="field"><span class="lbl">&nbsp;</span><button class="btn" id="hvAll">Même vitesse partout</button></div></div>
+      <div class="pts"><div class="pt hd"><span>Point</span><span>Vitesse</span><span>Prévu</span><span>Réel</span></div>
+      ${T.rows.map(r => `<div class="pt"><span class="n">${esc(r.nom)}<small>${r.dist != null ? fmtNum(r.dist) + ' NM' + (r.doute ? ' · à vérifier' : '') : 'départ'}</small></span>
+        ${r.k ? `<input data-vseg="${r.k}" type="text" inputmode="decimal" value="${fmtNum(r.v)}" aria-label="Vitesse vers ${esc(r.nom)}">` : '<span></span>'}
+        <span class="eta${r.reel ? ' real' : ''}">${r.eta != null ? tFmt(r.eta) : '—'}</span>
+        <button class="btn${r.reel ? '' : ' primary'}" data-log="${r.c}">${r.reel ? esc(r.reel) : 'Maint.'}</button></div>`).join('')}</div>
+      <p class="hint">« Maint. » inscrit l'heure réelle au point d'appel. Les heures suivantes se recalculent à partir de ce point. Toucher deux fois une heure inscrite l'efface.</p>
+      <p class="reg">Temps = distance ÷ vitesse, d'un point à l'autre. Distances du tableur du pilote (fichier_navigation.xlsx) ; tronçons CONQ → CSM → 110 à remesurer.<span class="src">Aide au calcul — vitesse sur l'eau, sans le courant. Les SCTM/VTS ont priorité.</span></p>`,
+      mount: r => {
+        const rer = () => go('heures', {id}, {replace:true}), save = () => DB.put('affectations', a);
+        r.querySelectorAll('input[name="hsens"]').forEach(i => i.onchange = () => { a.sens = i.value; a.vitesse = null; a.vSeg = {}; save(); rer(); });
+        r.querySelector('#hv').onchange = e => { const v = parseNum(e.target.value); if (!v) { toast('Vitesse invalide'); return; } a.vitesse = v; save(); rer(); };
+        r.querySelector('#hvAll').onclick = () => { const v = parseNum(r.querySelector('#hv').value); if (v) a.vitesse = v; a.vSeg = {}; save(); rer(); };
+        r.querySelectorAll('[data-vseg]').forEach(i => i.onchange = () => { const v = parseNum(i.value); a.vSeg = a.vSeg || {}; if (!v) delete a.vSeg[i.dataset.vseg]; else a.vSeg[i.dataset.vseg] = v; save(); rer(); });
+        let armed = null;
+        r.querySelectorAll('[data-log]').forEach(b => b.onclick = () => {
+          a.passages = a.passages || {}; const c = b.dataset.log;
+          if (a.passages[c]) {
+            if (armed !== c) { armed = c; toast(`Touchez encore pour effacer l'heure à ${ptName(c)}`); setTimeout(() => { armed = null; }, 3000); return; }
+            delete a.passages[c]; save(); toast('Heure effacée'); rer(); return;
+          }
+          a.passages[c] = hhmm(); save(); toast(`${ptName(c)} : ${a.passages[c]} inscrit`); rer();
+        });
+      }};
+  },
+  briefing({affId, navireId, departId, destId}) {
+    const a = DB.get('affectations', affId);
+    if (a) ({navireId, departId, destId} = a);
+    const secs = [], seen = new Map();
+    const section = (label, kind, ent, items, extra, ctx) => {
+      items.forEach(i => seen.set(i.id, i));
+      return `<section class="brief"><button class="brief-h" data-go="${kind}" data-id="${ent.id}"><span><span class="lbl">${esc(label)}</span><br><span class="t">${esc(ent.nom)}</span></span><span style="flex:1"></span>${ic('chev')}</button>
+        ${extra || ''}<div class="stack">${itemsBlock(items, ctx, 'Rien de noté pour l\'instant.')}</div></section>`;
+    };
+    const n = DB.get('navires', navireId);
+    if (n) {
+      const u = usage('navire', n.id);
+      const facts = [n.longueur != null && `L ${fmtM(n.longueur)}`, n.largeur != null && `B ${fmtM(n.largeur)}`, n.helice, n.bt && `BT ${n.bt}`, n.st && `ST ${n.st}`, `Piloté ${u.count} fois`].filter(Boolean);
+      secs.push(section('Navire', 'navire', n, itemsFor({navireId:n.id}).sort(sortBrief), `<div class="chips">${facts.map(f => `<span class="chip static">${esc(f)}</span>`).join('')}</div>`, {hideNavire:true}));
+    }
+    const lieuSec = (label, lid) => {
+      const l = DB.get('lieux', lid); if (!l) return;
+      const facts = [CAT[l.cat], l.profondeur != null && `Prof. réf. ${fmtM(l.profondeur)}`, l.angle && `Angle ${l.angle}`, l.hauteur != null && `Haut. ${fmtM(l.hauteur)}`, l.secteur].filter(Boolean);
+      const proc = l.procedure ? `<div class="info"><b>Procédure d'approche / de départ</b><br>${esc(l.procedure).replace(/\n/g, '<br>')}</div>` : '';
+      secs.push(section(label, 'lieu', l, itemsFor({lieuId:l.id}).sort(sortBrief), `<div class="chips">${facts.map(f => `<span class="chip static">${esc(f)}</span>`).join('')}</div>${proc}`, {hideLieu:true}));
+    };
+    lieuSec('Départ', departId);
+    if (destId !== departId && !(a && (a.destAutre || a.destMode === 'mer'))) lieuSec('Destination', destId);
+    const all = [...seen.values()];
+    const cnt = t => all.filter(x => x.kind !== 'manoeuvre' && x.ton === t).length;
+    const nm = all.filter(x => x.kind === 'manoeuvre').length;
+    return {title:'Notes de manœuvre', html:`
+      ${a ? `<div class="sub">${esc(n ? n.nom : '')} · ${fmtDate(a.date, true)}</div>` : ''}
+      <div class="brief-sum"><span class="tag t-neg">${pl(cnt('neg'), 'négatif', 'négatifs')}</span><span class="tag t-conseil">${pl(cnt('conseil'), 'conseil', 'conseils')}</span><span class="tag t-pos">${pl(cnt('pos'), 'positif', 'positifs')}</span><span class="tag t-man">${pl(nm, 'manœuvre', 'manœuvres')}</span></div>
+      ${secs.join('') || '<p class="empty">Choisissez un navire et un quai dans l\'affectation pour voir le briefing.</p>'}
+      ${a ? `<div class="row"><button class="btn primary" data-go="manEdit" data-aff-id="${a.id}">${ic('plus')} Manœuvre</button><button class="btn" data-go="noteEdit" data-aff-id="${a.id}">${ic('plus')} Note</button></div>` : ''}`};
+  },
+
+  /* Bottin téléphonique */
+  bottin({q = '', s = ''}) {
+    s = s || bottinDef();
+    const favs = DB.d.reglages.favoris, fk = p => p.code + '|' + p.nom;
+    const tel = t => t ? `<a class="tel" href="${esc(telHref(t))}">📞 ${esc(t)}</a>` : '';
+    const li = p => `<div class="li" data-name="${esc(norm(p.code + ' ' + p.prenom + ' ' + p.nom + ' ' + p.secteur))}" style="flex-wrap:wrap">
+      <span class="li-main"><span class="t"><span class="code">${esc(p.code)}</span> ${esc(p.prenom)} ${esc(p.nom)}</span><span class="s">Brevet ${esc(p.brevet)} · ${esc(p.secteur)}${p.doublon ? ' · <b>code en double</b>' : ''}</span></span>
+      <button class="favb" data-fav="${esc(fk(p))}" aria-pressed="${favs.includes(fk(p))}" aria-label="Favori : ${esc(p.prenom)} ${esc(p.nom)}">${ic('heart')}</button>
+      <span class="row" style="width:100%">${tel(p.cell)}${(p.autres || []).map(tel).join('')}</span></div>`;
+    const TIT = {favoris:'Favoris', commercial:'Commercial', pilotes:'Pilotes', transport:'Transport'};
+    let body;
+    if (s === 'commercial') body = '<p class="empty">À venir : agents et compagnies du bottin.</p>';
+    else if (s === 'transport') body = `<div class="li" style="flex-wrap:wrap"><span class="li-main"><span class="t">${esc(NAVETTE_DEF.nom)}</span><span class="s">${esc(NAVETTE_DEF.src)}</span></span><span class="row" style="width:100%">${tel(NAVETTE_DEF.tel)}</span></div><p class="sub">Autres services de transport : à venir.</p>`;
+    else {
+      const L = s === 'favoris' ? PILOTES.filter(p => favs.includes(fk(p))) : PILOTES;
+      body = `<input id="q" type="search" value="${esc(q)}" placeholder="Code, nom ou prénom" aria-label="Chercher dans le bottin" autocomplete="off">
+      <div class="stack" id="lst">${L.map(li).join('') || `<p class="empty">${s === 'favoris' ? 'Aucun favori. Touchez le cœur d\'un pilote.' : 'Liste vide.'}</p>`}</div>`;
+    }
+    return {title:TIT[s] || 'Bottin', html:body, mount: r => {
+      const qi = r.querySelector('#q'); if (!qi) return;
+      const f = () => { const Q = norm(qi.value); stack[stack.length - 1].params = {s, q:qi.value}; r.querySelectorAll('#lst .li').forEach(b => b.hidden = !b.dataset.name.includes(Q)); };
+      qi.oninput = f; f();
+      r.querySelectorAll('[data-fav]').forEach(b => b.onclick = () => {
+        const k = b.dataset.fav, i = favs.indexOf(k); if (i >= 0) favs.splice(i, 1); else favs.push(k); DB.save();
+        if (s === 'favoris') go('bottin', {s, q:qi.value}, {replace:true}); else b.setAttribute('aria-pressed', String(i < 0));
+      });
+    }};
+  },
+
+  /* Recherche */
+  search({q = ''}) {
+    return {title:'Recherche', html:`<input id="sq" type="search" value="${esc(q)}" placeholder="Navire, quai, remorqueur, mot-clé…" aria-label="Rechercher" enterkeyhint="search" autocomplete="off"><div id="sres" class="stack"></div>`,
+      mount: r => {
+        const inp = r.querySelector('#sq');
+        const draw = () => {
+          stack[stack.length - 1].params = {q: inp.value};
+          const Q = norm(inp.value), out = r.querySelector('#sres');
+          if (!Q) { out.innerHTML = '<p class="empty">Exemples : « Bear », « 36 », « remorqueur », « courant ».</p>'; return; }
+          const has = (...xs) => xs.some(x => norm(x).includes(Q));
+          const navs = DB.list('navires').filter(n => has(n.nom, n.type, n.notes, n.effetTransversal)).sort(byName);
+          const lx = DB.list('lieux').filter(l => has(l.nom, l.secteur, l.notes, l.compagnie)).sort(byName);
+          const ns = DB.list('notes').filter(n => has(n.texte, n.positifs, n.negatifs, n.remorqueurs, n.vent, n.courant, n.sourceNom,
+            n.navireId && pickLabel('navires', n.navireId), n.lieuId && pickLabel('lieux', n.lieuId))).sort(sortBrief).slice(0, 60);
+          out.innerHTML = (navs.length ? `<h2 class="h2">Navires <span class="cnt">${navs.length}</span></h2>` + navs.map(n => `<button class="li" data-go="navire" data-id="${n.id}">${ic('ship')}<span class="li-main"><span class="t">${esc(n.nom)}</span><span class="s">${esc(subOf('navires', n))}</span></span></button>`).join('') : '')
+            + (lx.length ? `<h2 class="h2">Lieux <span class="cnt">${lx.length}</span></h2>` + lx.map(l => `<button class="li" data-go="lieu" data-id="${l.id}">${ic(CAT_IC[l.cat])}<span class="li-main"><span class="t">${esc(l.nom)}</span><span class="s">${esc(subOf('lieux', l))}</span></span></button>`).join('') : '')
+            + (ns.length ? `<h2 class="h2">Notes et manœuvres <span class="cnt">${ns.length}</span></h2>` + ns.map(n => itemCard(n)).join('') : '')
+            || '<p class="empty">Aucun résultat.</p>';
+        };
+        inp.oninput = draw; draw(); if (!q) setTimeout(() => inp.focus(), 60);
+      }};
+  },
+
+  /* Compteurs */
+  compteurs() {
+    const st = currentStretch(), y = curYear();
+    const years = [...new Set(DB.list('affectations').map(a => a.date.slice(0, 4)))].filter(x => x !== y).sort().reverse();
+    const hist = stretchesSorted().reverse();
+    const sAll = stretchesSorted();
+    const histLi = s => { const i = sAll.findIndex(x => x.id === s.id), nxt = sAll[i + 1];
+      return `<div class="li"><span class="li-main"><span class="t">${fmtDate(s.debut)} → ${nxt ? fmtDate(nxt.debut) : 'en cours'}</span><span class="s">${s === st ? 'Stretch en cours' : 'Terminé'}</span></span><span class="li-side"><span class="n">${pl(stretchCount(s), 'navire', 'navires')}</span></span></div>`; };
+    return {title:'Compteurs', html:`
+      <h2 class="h2">Stretch en cours</h2>
+      ${st ? `<div class="readout big accent"><span class="k">Navires ce stretch</span><span class="v">${pad(stretchCount(st))}</span><span class="s">Commencé le ${fmtDate(st.debut, true)}</span></div>`
+        : '<p class="empty">Aucun stretch en cours. Démarrez-en un au début de votre période de travail.</p>'}
+      <div><button class="btn primary block tall" id="btnStretch">${st ? 'Nouveau stretch (remise à zéro)' : 'Démarrer un stretch'}</button></div>
+      <p class="hint">Oubli de remise à zéro ? Ouvrez la fiche concernée, « Modifier », puis choisissez l'autre stretch dans « Compteur ». Les totaux se recalculent seuls.</p>
+      <h2 class="h2">Année ${y}</h2>
+      <div class="readout big"><span class="k">1ᵉʳ janvier au 31 décembre ${y}</span><span class="v">${pad(yearCount(y))}</span><span class="s">navires pilotés</span></div>
+      ${years.length ? `<h2 class="h2">Années précédentes</h2><div class="stack">${years.map(yy => `<div class="li"><span class="li-main"><span class="t">${yy}</span></span><span class="li-side"><span class="n">${pl(yearCount(yy), 'navire', 'navires')}</span></span></div>`).join('')}</div>` : ''}
+      ${hist.length ? `<h2 class="h2">Historique des stretches</h2><div class="stack">${hist.map(histLi).join('')}</div>` : ''}`,
+      mount: r => {
+        const rer = () => go('compteurs', {}, {replace:true});
+        const b = r.querySelector('#btnStretch');
+        const start = () => { DB.put('stretches', {debut:nowLocal()}); toast('Nouveau stretch commencé : compteur à 0'); rer(); };
+        b.onclick = () => st ? confirmInline(b, `Terminer le stretch en cours (${stretchCount(st)} navires) et repartir à zéro ?`, start, 'Oui, nouveau stretch', true) : start();
+      }};
+  },
+
+  /* Réglages et sauvegarde */
+  reglages() {
+    const t = DB.d.reglages.theme || 'auto', j = DB.d.reglages.jour || 'marin', bk = readBackup();
+    const LISTES = [['gouvernail', 'Gouvernails'], ['type', 'Types de navire'], ['cargo', 'Cargaisons']];
+    const d = DB.d, nm = d.notes.filter(n => n.kind === 'manoeuvre').length;
+    return {title:'Réglages', html:`
+      <h2 class="h2">Affichage</h2>
+      <div class="seg">${[['auto','Comme le téléphone'],['jour','Jour'],['nuit','Nuit (rouge)']].map(([v, l]) => `<label class="seg-opt"><input type="radio" name="theme" value="${v}"${t === v ? ' checked' : ''}><span>${l}</span></label>`).join('')}</div>
+      <span class="lbl">Thème de jour</span>
+      <div class="seg">${[['marin','Bleu marin'],['blanc','Blanc'],['vert','Vert']].map(([v, l]) => `<label class="seg-opt"><input type="radio" name="jour" value="${v}"${j === v ? ' checked' : ''}><span>${l}</span></label>`).join('')}</div>
+      <p class="hint">« Comme le téléphone » : quand le téléphone passe en mode sombre, l'application passe en mode nuit, noir et rouge.</p>
+      <span class="lbl">Bouton d'affectation active, la nuit</span>
+      <div class="seg">${[['on','Pulsation lente'],['off','Aucun clignotement']].map(([v, l]) => `<label class="seg-opt"><input type="radio" name="pulse" value="${v}"${(DB.d.reglages.pulseNuit || 'on') === v ? ' checked' : ''}><span>${l}</span></label>`).join('')}</div>
+      <h2 class="h2">Mes listes</h2>
+      ${LISTES.map(([k, l]) => `<h3 class="grp">${esc(l)}</h3><div class="chips">${liste(k).map((v, i) => `<span class="lchip">${esc(v)}<button data-ldel="${k}" data-i="${i}" aria-label="Retirer ${esc(v)}">✕</button></span>`).join('') || '<span class="sub">Liste vide.</span>'}</div>
+        <div class="toolbar"><input data-lin="${k}" type="text" placeholder="Ajouter à la liste…" aria-label="Ajouter à ${esc(l)}" autocomplete="off"><button class="btn" data-ladd="${k}">Ajouter</button></div>`).join('')}
+      <p class="hint">Les quais, mouillages et remorqueurs s'ajoutent ou se suppriment dans Quai / Rivière.</p>
+      <h2 class="h2">Mes données</h2>
+      ${specsHTML([{k:'Navires', v:String(d.navires.length)}, {k:'Quais & lieux', v:String(d.lieux.length)}, {k:'Notes', v:String(d.notes.length - nm)}, {k:'Manœuvres', v:String(nm)}, {k:'Affectations', v:String(d.affectations.length)}, {k:'Stretches', v:String(d.stretches.length)}])}
+      <p class="info">Pour l'instant, les données sont enregistrées sur cet appareil. La prochaine étape : Firebase, pour avoir la même base sur le PC et le téléphone.</p>
+      <h2 class="h2">Sauvegarde</h2>
+      <div class="row"><button class="btn" id="btnDl">Télécharger un fichier</button><button class="btn" id="btnCp">Copier le texte</button></div>
+      <p class="hint">La sauvegarde contient vos fiches, vos notes perso et le bottin : ne la partagez pas.${PWA ? '' : ' Ici, utilisez « Copier le texte ».'}</p>
+      <textarea id="expTxt" readonly hidden aria-label="Texte de la sauvegarde"></textarea>
+      <h2 class="h2">Restaurer une sauvegarde</h2>
+      <label class="btn block" for="impFile">Choisir un fichier .json</label><input class="vh" type="file" id="impFile" accept=".json,application/json">
+      <textarea id="impTxt" placeholder="…ou collez ici le texte d'une sauvegarde" aria-label="Texte d'une sauvegarde à restaurer"></textarea>
+      <button class="btn block" id="btnChk">Vérifier la sauvegarde</button>
+      <div id="impPrev"></div>
+      ${bk ? `<h2 class="h2">Copie de secours</h2><p class="sub">Créée automatiquement le ${fmtDate(bk.date, true)}, juste avant la dernière restauration.</p><div><button class="btn block" id="btnBk">Revenir à cette copie</button></div>` : ''}
+      <h2 class="h2">À propos</h2>
+      <p class="sub">Marine Pilot Pro · ${VERSION}</p>
+      <p class="disclaimer">Aide-mémoire personnel. Les calculs et notes assistent la décision; le pilote en garde la responsabilité. Les instructions des SCTM/VTS priment.</p>`,
+      mount: r => {
+        r.querySelectorAll('input[name="theme"]').forEach(i => i.onchange = () => { DB.d.reglages.theme = i.value; DB.save(); applyTheme(); });
+        r.querySelectorAll('input[name="jour"]').forEach(i => i.onchange = () => { DB.d.reglages.jour = i.value; DB.save(); applyTheme(); });
+        r.querySelectorAll('input[name="pulse"]').forEach(i => i.onchange = () => { DB.d.reglages.pulseNuit = i.value; DB.save(); applyTheme(); });
+        const rer = () => go('reglages', {}, {replace:true});
+        r.querySelectorAll('[data-ladd]').forEach(b => b.onclick = () => { const k = b.dataset.ladd, inp = r.querySelector(`[data-lin="${k}"]`), v = inp.value.trim();
+          if (!v) return; if (liste(k).some(x => norm(x) === norm(v))) { toast('Déjà dans la liste'); return; } DB.d.reglages.listes[k].push(v); DB.save(); rer(); });
+        r.querySelectorAll('[data-ldel]').forEach(b => b.onclick = () => { DB.d.reglages.listes[b.dataset.ldel].splice(+b.dataset.i, 1); DB.save(); rer(); });
+        const payload = () => JSON.stringify({app:'marine-pilot-pro', schema:1, exporte:nowLocal(), data:{...DB.d, prive:undefined}, prive:{pilotes:PILOTES, tels:TELS}});
+        r.querySelector('#btnDl').onclick = () => {
+          try {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([payload()], {type:'application/json'}));
+            a.download = `marine-pilot-pro_sauvegarde_${nowLocal().slice(0, 10)}.json`;
+            document.body.appendChild(a); a.click();
+            setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+          } catch (e) { toast('Téléchargement impossible ici. Utilisez « Copier le texte ».'); }
+        };
+        r.querySelector('#btnCp').onclick = () => {
+          const txt = payload(), ta = r.querySelector('#expTxt');
+          const fallback = () => { ta.value = txt; ta.hidden = false; ta.focus(); ta.select(); toast('Le texte est sélectionné : copiez-le.'); };
+          try { navigator.clipboard.writeText(txt).then(() => toast('Sauvegarde copiée'), fallback); } catch (e) { fallback(); }
+        };
+        r.querySelector('#impFile').onchange = e => {
+          const f = e.target.files[0]; if (!f) return;
+          const fr = new FileReader(); fr.onload = () => { r.querySelector('#impTxt').value = fr.result; check(); }; fr.readAsText(f);
+        };
+        const check = () => {
+          const prev = r.querySelector('#impPrev');
+          let data, prive;
+          try { const j = JSON.parse(r.querySelector('#impTxt').value); data = j && j.data ? j.data : j; prive = j && j.prive; } catch (e) { data = null; }
+          if (!data || data.schema !== 1 || !Array.isArray(data.navires) || !Array.isArray(data.notes)) { prev.innerHTML = '<p class="empty">Ce texte n\'est pas une sauvegarde Marine Pilot Pro valide.</p>'; return; }
+          prev.innerHTML = `<p class="info">Sauvegarde valide : ${data.navires.length} navires, ${(data.lieux || []).length} lieux, ${data.notes.length} notes et manœuvres, ${(data.affectations || []).length} affectations.</p><div><button class="btn primary block" id="btnImp">Remplacer mes données par cette sauvegarde</button></div>`;
+          const bi = prev.querySelector('#btnImp');
+          bi.onclick = () => confirmInline(bi, 'Vos données actuelles seront remplacées. Une copie de secours est créée avant.', () => {
+            const pv = prive && Array.isArray(prive.pilotes) ? prive : DB.d.prive; writeBackup(); DB.d = data; if (pv) DB.d.prive = pv; DB.norm(); DB.save(); hydrate(); applyTheme(); toast('Sauvegarde restaurée'); go('home', {}, {reset:true});
+          }, 'Remplacer');
+        };
+        r.querySelector('#btnChk').onclick = check;
+        const bb = r.querySelector('#btnBk');
+        if (bb) bb.onclick = () => confirmInline(bb, 'Revenir à la copie de secours ? Les données actuelles seront remplacées.', () => {
+          const b = readBackup(); writeBackup(); DB.d = b.data; DB.norm(); DB.save(); hydrate(); applyTheme(); toast('Copie de secours restaurée'); go('home', {}, {reset:true});
+        }, 'Revenir à la copie');
+      }};
+  }
+};
+function affLi(a) {
+  const k = ranks(a), t = tempsTrajet(a), nm = a.navireId ? pickLabel('navires', a.navireId) : 'Navire ?';
+  const badge = a.statut === 'route' ? ' · <b class="ok-t">EN ROUTE</b>' : a.statut === 'prep' ? ' · <b class="warn-t">EN PRÉPARATION</b>' : '';
+  return `<button class="li" data-go="aff" data-id="${a.id}" data-name="${esc(norm(nm))}">${ic('clip')}<span class="li-main"><span class="t">${esc(nm)}</span><span class="s">${fmtDate(a.date, true)} · ${esc(depNom(a) || '?')} → ${esc(destNom(a) || '?')}${t != null ? ' · trajet ' + dureeFmt(t) : ''}${badge}</span></span>
+    <span class="li-side"><span class="n">${k.sr != null ? 'S' + k.sr + ' · ' : ''}A${k.yr}</span></span></button>`;
+}
+function hydrate() {
+  const pv = DB.d.prive; if (INJECTE || !pv) return;
+  if (Array.isArray(pv.pilotes)) PILOTES.splice(0, PILOTES.length, ...pv.pilotes);
+  if (pv.tels) { if (pv.tels.navette) TELS.navette = String(pv.tels.navette); if (pv.tels.lpa) TELS.lpa = String(pv.tels.lpa); NAVETTE_DEF.tel = TELS.navette || ''; }
+}
+function readBackup() { try { const b = JSON.parse(localStorage.getItem(BACKUP_KEY)); return b && b.data ? b : null; } catch (e) { return null; } }
+function writeBackup() { try { localStorage.setItem(BACKUP_KEY, JSON.stringify({date:nowLocal(), data:DB.d})); } catch (e) {} }
+const MQ = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+function applyTheme() {
+  const r = DB.d.reglages, t = r.theme || 'auto';
+  const eff = (t === 'nuit' || (t === 'auto' && MQ && MQ.matches)) ? 'nuit' : (r.jour || 'marin');
+  document.documentElement.setAttribute('data-theme', eff);
+  document.documentElement.setAttribute('data-pulse', r.pulseNuit || 'on');
+}
+if (MQ) { try { MQ.addEventListener('change', applyTheme); } catch (e) { try { MQ.addListener(applyTheme); } catch (e2) {} } }
+function updStatus() {
+  const st = currentStretch(), y = curYear();
+  $('#cnt').textContent = `${st ? pad(stretchCount(st)) : '00'}-${pad(yearCount(y))}`;
+  $('#clock').textContent = hhmm();
+  const sc = document.getElementById('shClock'); if (sc) sc.textContent = hhmm();
+}
+setInterval(() => {
+  updStatus();
+  if (persoUntil && !persoOk()) { persoUntil = 0; if (stack[stack.length - 1].view === 'perso') go('perso', {}, {replace:true}); }
+}, 10000);
+
+/* ---------- Démarrage ---------- */
+$('#btnBack').innerHTML = ic('back');
+$('#btnBack').onclick = () => (PWA && stack.length > 1) ? history.back() : back();
+$('#tabs').onclick = e => {
+  const b = e.target.closest('[data-tab]'); if (!b) return;
+  if (b.dataset.s) go('bottin', {s:b.dataset.s}, {replace:true}); else go(b.dataset.tab, {}, {reset:true});
+};
+$('#title').onclick = e => { if (e.target.closest('#brandBtn')) go('reglages'); };
+$('#main').addEventListener('click', e => {
+  const ap = e.target.closest('[data-appel]'); if (ap) { openAppel(ap.dataset.appel, ap.dataset.id); return; }
+  if (e.target.closest('[data-notel]')) { toast('Numéro absent : restaurez votre sauvegarde dans Réglages.'); return; }
+  const sa = e.target.closest('[data-start]'); if (sa) { startAff(sa.dataset.start); return; }
+  const fi = e.target.closest('[data-finish]'); if (fi) { finishAff(fi.dataset.finish, fi); return; }
+});
+$('#main').addEventListener('click', e => {
+  const el = e.target.closest('[data-go]'); if (!el) return;
+  const {go: v, replace, ...p} = el.dataset;
+  go(v, p, {replace: !!replace});
+});
+DB.load();
+hydrate();
+applyTheme();
+stack.push({view:'home', params:{}});
+render();
+if (PWA && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) {} }
+})();
+</script>
+</body>
+</html>
