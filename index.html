@@ -199,7 +199,12 @@ textarea{min-height:120px;resize:vertical;line-height:1.45}
 .with-unit{position:relative;display:block}
 .with-unit input{padding-right:44px;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
 .with-unit>span{position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--muted);font:500 16px var(--font-mono)}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.grid2>.field,.grid2>div{min-width:0}
+.grid2 input[type=date]{width:100%;min-width:0;padding-left:8px;padding-right:4px;font-size:15px}
+.grid2 .seg{flex-wrap:nowrap}
+.grid2 .seg-opt{min-width:0}
+.grid2 .seg-opt span{padding:0 6px}
 .seg{display:flex;flex-wrap:wrap;gap:8px}
 .seg-opt{position:relative;flex:1 1 auto}
 .seg-opt input{position:absolute;inset:0;width:100%;height:100%;min-height:0;margin:0;opacity:0}
@@ -243,6 +248,10 @@ textarea{min-height:120px;resize:vertical;line-height:1.45}
 .form .sec:first-child{margin-top:0;border-top:0;padding-top:0}
 .timef{display:grid;grid-template-columns:1fr auto;gap:8px}
 .timef input{font:500 22px var(--font-mono);letter-spacing:.06em}
+.timef .btn{min-height:40px;padding:0 10px;font-size:14px;align-self:center}
+.powf{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px}
+.powf .btn{min-width:50px;padding:0 8px}
+#f_meteo{min-height:120px}
 .chk{display:flex;align-items:center;gap:12px;min-height:52px;padding:0 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface);font-weight:600}
 .chk input{width:24px;height:24px;accent-color:var(--accent)}
 .reg{margin:0;padding:12px 14px;border-radius:12px;border:1px dashed var(--muted);background:var(--surface-2);color:var(--muted);font-size:15px}
@@ -355,7 +364,7 @@ a.li{text-decoration:none;color:inherit}
 <script>
 (() => {
 'use strict';
-const VERSION = 'v0.15.1 · prête pour le site ProPilot (22 nov. 2026)';
+const VERSION = 'v0.16 · nouvelle fiche d\'affectation (23 nov. 2026)';
 const PWA = !!window.MPP_PWA;
 
 /* ---------- Utilitaires ---------- */
@@ -737,20 +746,18 @@ const NAVIRE_F = [
   {k:'type', label:'Type', type:'selList', list:'type'},
   {k:'longueur', label:'Longueur', type:'num', unit:'m', half:true},
   {k:'largeur', label:'Largeur', type:'num', unit:'m', half:true},
-  {k:'creux', label:'Creux', type:'num', unit:'m', half:true},
-  {k:'hauteur', label:'Hauteur totale (quille → sommet)', type:'num', unit:'m', half:true},
-  {k:'puissance', label:'Puissance / propulsion', type:'text', hint:'ex. 9 000 kW, moteur lent'},
+  {k:'hauteur', label:'Creux (quille → mât)', type:'num', unit:'m'},
+  {k:'puissance', label:'Moteur', type:'pow', half:true},
+  {k:'swl', label:'Bittes (SWL)', type:'num', unit:'t', half:true},
   {k:'helice', label:'Hélice', type:'seg', opts:[['FPP','Pas fixe (FPP)'],['CPP','Pas variable (CPP)'],['','?']]},
   {k:'rotation', label:'Rotation de l\'hélice en avant', type:'seg', opts:[['droite','À droite'],['gauche','À gauche'],['','?']]},
   {k:'effetTransversal', label:'Effet transversal', type:'text', hint:'ex. arrière vers bâbord en battant arrière'},
   {k:'marcheArriere', label:'Marche arrière (reculon)', type:'text'},
-  {k:'gouvernail', label:'Gouvernail', type:'selList', list:'gouvernail'},
+  {k:'reculP', label:'Puissance de recul', type:'pow', half:true},
+  {k:'gouvernail', label:'Gouvernail', type:'selList', list:'gouvernail', half:true},
   {k:'gouvNote', label:'Réponse à la barre (notes)', type:'text'},
-  {k:'bt', label:'Propulseur d\'étrave (BT)', type:'text', hint:'ex. 1 200 kW, ou « aucun »'},
-  {k:'stOn', label:'Propulseur arrière (ST)', type:'check'},
-  {k:'st', label:'Propulseur de poupe (ST) — puissance', type:'text', when:['stOn', true]},
-  {k:'recul', label:'Puissance de recul', type:'num', unit:'%', half:true},
-  {k:'swl', label:'Bittes (SWL)', type:'num', unit:'t', half:true},
+  {k:'bt', label:'Propulseur avant', type:'pow', half:true},
+  {k:'st', label:'Propulseur arrière', type:'pow', half:true},
   {k:'confirme', label:'Données confirmées à bord le', type:'date'},
   {k:'notes', label:'Particularités générales', type:'textarea'}
 ];
@@ -801,7 +808,7 @@ const MAN_F = [
   {k:'date', label:'Date', type:'datetime'}
 ];
 // Fiche navire (spécification du 17 nov. + ajouts du 19 nov.). Les champs n_* sont ceux du navire : préchargés et réenregistrés dans sa fiche.
-const NAV_KEYS = ['longueur','largeur','creux','hauteur','type','bt','stOn','st','recul','gouvernail','swl'];
+const NAV_KEYS = ['longueur','largeur','hauteur','type','bt','st','puissance','reculP','gouvernail','swl'];
 const AFF_F = [
   {sec:'Affectation'},
   {k:'date', label:'Date et heure d\'affectation', type:'datetime', req:true},
@@ -810,39 +817,40 @@ const AFF_F = [
   {k:'n_type', label:'Type', type:'selList', list:'type'},
   {k:'n_longueur', label:'Longueur', type:'num', unit:'m', half:true},
   {k:'n_largeur', label:'Largeur', type:'num', unit:'m', half:true},
-  {k:'n_creux', label:'Creux', type:'num', unit:'m', half:true},
-  {k:'n_hauteur', label:'Hauteur totale', type:'num', unit:'m', half:true},
-  {k:'n_bt', label:'Propulseur avant (BT)', type:'text', hint:'puissance, ex. 1 200 hp'},
-  {k:'n_stOn', label:'Propulseur arrière (ST)', type:'check'},
-  {k:'n_st', label:'Propulseur arrière — puissance', type:'text', when:['n_stOn', true]},
-  {k:'n_recul', label:'Puissance de recul', type:'num', unit:'%', half:true},
+  {k:'n_hauteur', label:'Creux (quille → mât)', type:'num', unit:'m'},
+  {k:'n_bt', label:'Propulseur avant', type:'pow', half:true},
+  {k:'n_st', label:'Propulseur arrière', type:'pow', half:true},
+  {k:'n_puissance', label:'Moteur', type:'pow', half:true},
   {k:'n_swl', label:'Bittes (SWL)', type:'num', unit:'t', half:true},
-  {k:'n_gouvernail', label:'Gouvernail', type:'selList', list:'gouvernail'},
+  {k:'n_reculP', label:'Puissance de recul', type:'pow', half:true},
+  {k:'n_gouvernail', label:'Gouvernail', type:'selList', list:'gouvernail', half:true},
   {sec:'Voyage — données du jour'},
   {k:'depart', label:'Départ', type:'quaiSel'},
   {k:'dest', label:'Destination', type:'quaiSel'},
-  {k:'eta', label:'ETA à destination', type:'datetime', blank:true},
+  {k:'eta', label:'ETA à destination', type:'date', half:true},
+  {k:'etaAP', label:'AM / PM', type:'seg', opts:[['AM','AM'],['PM','PM']], half:true},
   {k:'cargo', label:'Cargaison', type:'datalist', list:'cargo', half:true},
   {k:'quantite', label:'Quantité', type:'text', half:true},
-  {k:'dg', label:'Matières dangereuses (quantité)', type:'text'},
+  {k:'dg', label:'Matières dangereuses', type:'text', half:true},
+  {k:'dgQte', label:'Quantité', type:'text', half:true},
   {k:'teAv', label:'Tirant d\'eau AV', type:'num', unit:'m', half:true},
   {k:'teAr', label:'Tirant d\'eau AR', type:'num', unit:'m', half:true},
   {calc:'ta', label:'Tirant d\'air (calculé)'},
-  {k:'agent', label:'Agent', type:'text', half:true},
-  {k:'meteo', label:'Météo', type:'text', half:true},
+  {k:'agent', label:'Agent', type:'text'},
+  {k:'meteo', label:'Météo', type:'textarea', hint:'Montréal à Trois-Rivières. Rempli automatiquement, modifiable.'},
   {sec:'Temps'},
-  {k:'hDepart', label:'Parti', type:'time', half:true},
-  {k:'hDebarque', label:'Débarqué', type:'time', half:true},
-  {k:'hTugs', label:'Remorqueurs', type:'time', half:true},
-  {k:'hLines', label:'Linesmen', type:'time', half:true},
-  {k:'releve', label:'Relève', type:'check'},
-  {k:'hReleve', label:'Heure de la relève', type:'time', when:['releve', true]},
+  {k:'hDepart', label:'Parti', type:'time'},
+  {k:'hDebarque', label:'Débarqué', type:'time', later:true},
+  {k:'hTugs', label:'Remorqueurs', type:'time', half:true, later:true},
+  {k:'hLines', label:'Linesmen', type:'time', half:true, later:true},
+  {k:'releve', label:'Relève', type:'check', later:true},
+  {k:'hReleve', label:'Heure de la relève', type:'time', when:['releve', true], later:true},
   {sec:'Remorqueurs'},
-  {k:'tugAvId', label:'Remorqueur avant', type:'pick', col:'lieux', defCat:'remorqueur'},
-  {k:'tugArId', label:'Remorqueur arrière', type:'pick', col:'lieux', defCat:'remorqueur'},
+  {k:'tugAvId', label:'Remorqueur avant', type:'pick', col:'lieux', defCat:'remorqueur', onlyCat:'remorqueur'},
+  {k:'tugArId', label:'Remorqueur arrière', type:'pick', col:'lieux', defCat:'remorqueur', onlyCat:'remorqueur'},
   {sec:'Heures aux points d\'appel'},
   {k:'sens', label:'Sens', type:'seg', opts:[['montant','Montant (PDO → 110)'],['descendant','Descendant (110 → PDO)']]},
-  {k:'vitesse', label:'Vitesse prévue', type:'num', unit:'nd', hint:'Vide = 10 nœuds en montant, 14 en descendant'},
+  {k:'vitesse', label:'Vitesse prévue', type:'num', unit:'nd', hint:'10 nœuds en montant, 14 en descendant. Modifiable.'},
   {sec:'Compteur'},
   {k:'stretchId', label:'Stretch de cette fiche', type:'selkv', opts:() => [['', '— aucun —'], ...stretchesSorted().reverse().map(s => [s.id, stretchLabel(s) + (s === currentStretch() ? ' (en cours)' : '')])], hint:'Pour corriger un oubli de remise à zéro : choisissez l\'autre stretch.'}
 ];
@@ -870,6 +878,53 @@ function parseTime(v) {
   if (!m) return null; const h = +m[1], mi = +m[2];
   return h < 24 && mi < 60 ? `${pad(h)}:${pad(mi)}` : null;
 }
+// Puissance : gardée comme « 1200 kW » ou « 1500 HP ». Un ancien texte sans unité reste tel quel.
+const KW_HP = 1.34102; // 1 kW = 1,34102 hp mécanique
+function powParse(v) {
+  const raw = String(v ?? '').trim(); if (!raw) return {n:null, u:'HP', raw:''};
+  const m = raw.match(/^([\d\s.,]+?)\s*(kw|bhp|hp)?$/i); if (!m) return {n:null, u:'', raw};
+  let t = m[1].replace(/\s/g, ''); if (/^\d{1,3}([.,]\d{3})+$/.test(t)) t = t.replace(/[.,]/g, '');
+  const n = parseNum(t); if (n == null || Number.isNaN(n)) return {n:null, u:'', raw};
+  return {n, u:m[2] ? (/kw/i.test(m[2]) ? 'kW' : 'HP') : '', raw};
+}
+function powHP(v) {
+  const p = powParse(v); if (p.n == null || !p.u) return p.raw;
+  return `${fmtNum(p.u === 'kW' ? Math.round(p.n * KW_HP) : p.n)} HP`;
+}
+function readPow(el) {
+  const raw = el.value.trim(); if (!raw) return '';
+  const p = powParse(raw), u = p.u || el.parentNode.querySelector('[data-powu]').dataset.u;
+  return p.n == null || !u ? raw : `${p.n} ${u}`;
+}
+function updPow(el) {
+  const p = powParse(el.value), b = el.parentNode.querySelector('[data-powu]'), h = el.closest('.field').querySelector('[data-powh]');
+  const u = p.u || b.dataset.u;
+  h.textContent = p.n == null ? '' : !u ? 'Touchez ? pour choisir HP ou kW' : u === 'kW' ? `= ${fmtNum(Math.round(p.n * KW_HP))} HP` : '';
+}
+function setPow(el, v) {
+  const p = powParse(v), b = el.parentNode.querySelector('[data-powu]');
+  el.value = p.n != null ? String(p.n).replace('.', ',') : p.raw;
+  el.inputMode = p.n == null && p.raw ? 'text' : 'decimal';
+  b.dataset.u = p.u; b.textContent = p.u || '?'; updPow(el);
+}
+const etaAPde = e => e && e.includes('T') ? (+e.slice(11, 13) < 12 ? 'AM' : 'PM') : '';
+const etaTxt = a => !a.eta ? '' : a.eta.includes('T') ? fmtDate(a.eta, true) : fmtDate(a.eta) + (a.etaAP ? ' ' + a.etaAP : '');
+const dgTxt = a => [a.dg, a.dgQte].filter(Boolean).join(' · ');
+// Météo marine officielle (ECCC), zone Montréal à Trois-Rivières.
+const METEO_URL = 'https://api.weather.gc.ca/collections/marineweather-realtime/items/m0000077?f=json&lang=fr';
+async function meteoMTR() {
+  const c = new AbortController(), to = setTimeout(() => c.abort(), 8000);
+  try {
+    const res = await fetch(METEO_URL, {signal:c.signal}); if (!res.ok) throw new Error('météo');
+    const p = (await res.json()).properties, reg = p.regularForecast, w = reg.locations[0].weatherCondition;
+    const frs = [], walk = o => { if (!o || typeof o !== 'object') return; if (typeof o.fr === 'string') { frs.push(o.fr); return; } Object.values(o).forEach(walk); };
+    walk((p.warnings || {}).locations);
+    const cles = Object.keys(w).filter(k => k !== 'periodOfCoverage' && w[k] && typeof w[k].fr === 'string').sort((x, y) => (y === 'wind') - (x === 'wind'));
+    const em = String(reg.issuedDatetimeLocal || ''), lignes = cles.map(k => w[k].fr);
+    if (!lignes.length) throw new Error('météo');
+    return [...(frs.length ? ['⚠ ' + frs.join(' · ')] : []), ...lignes, `(Environnement Canada, émis le ${fmtDate(em, true)})`].join('\n');
+  } finally { clearTimeout(to); }
+}
 const hhmm = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 
 function fieldHTML(f, v) {
@@ -880,6 +935,9 @@ function fieldHTML(f, v) {
   switch (f.type) {
     case 'num':
       h = `<label class="field" for="${id}">${lbl}<span class="with-unit"><input id="${id}" name="${f.k}" type="text" inputmode="decimal" autocomplete="off" value="${v == null ? '' : esc(String(v).replace('.', ','))}"><span>${esc(f.unit)}</span></span>${hint}</label>`; break;
+    case 'pow': {
+      const p = powParse(v), val = p.n != null ? String(p.n).replace('.', ',') : p.raw;
+      h = `<div class="field"><label class="lbl" for="${id}">${esc(f.label)}</label><span class="powf"><input id="${id}" name="${f.k}" type="text" inputmode="${p.n == null && p.raw ? 'text' : 'decimal'}" autocomplete="off" value="${esc(val)}"><button type="button" class="btn" data-powu="${id}" data-u="${p.u}" aria-label="Unité : HP ou kW">${p.u || '?'}</button></span><span class="hint" data-powh></span></div>`; break; }
     case 'textarea':
       h = `<label class="field ${f.cls || ''}" for="${id}">${lbl}<textarea id="${id}" name="${f.k}" rows="4">${esc(v)}</textarea>${hint}</label>`; break;
     case 'select':
@@ -941,6 +999,7 @@ function readForm(form, fields) {
     else if (f.type === 'seg') o[f.k] = form.querySelector(`input[name="${f.k}"]:checked`)?.value ?? '';
     else if (f.type === 'pick') o[f.k] = form.querySelector('#f_' + f.k).dataset.value || null;
     else if (f.type === 'num') o[f.k] = parseNum(form.querySelector('#f_' + f.k).value);
+    else if (f.type === 'pow') o[f.k] = readPow(form.querySelector('#f_' + f.k));
     else o[f.k] = form.querySelector('#f_' + f.k).value.trim();
   }
   return o;
@@ -951,11 +1010,20 @@ function mountForm(root, fields, {onSubmit, onDelete, validate, delMsg, onPick})
     const f = fields.find(x => x.k === b.dataset.k);
     b.onclick = () => openPicker({
       title: f.label, col: f.col, allowNone: !f.req,
-      defCat: typeof f.defCat === 'function' ? f.defCat(root) : (f.defCat || 'quai'),
+      defCat: typeof f.defCat === 'function' ? f.defCat(root) : (f.defCat || 'quai'), onlyCat: f.onlyCat,
       onPick: id => { b.dataset.value = id || ''; b.querySelector('.pv').textContent = id ? pickLabel(f.col, id) : 'Choisir ou créer…'; b.classList.toggle('empty', !id); if (onPick) onPick(f.k, id, form); }
     });
   });
-  root.querySelectorAll('[data-now]').forEach(b => b.onclick = () => { const i = root.querySelector('#' + b.dataset.now); i.value = hhmm(); });
+  root.querySelectorAll('[data-now]').forEach(b => {
+    const i = root.querySelector('#' + b.dataset.now);
+    b.onclick = () => { i.value = hhmm(); };
+    i.addEventListener('blur', () => { const t = parseTime(i.value); if (t) i.value = t; });
+  });
+  root.querySelectorAll('[data-powu]').forEach(b => {
+    const i = root.querySelector('#' + b.dataset.powu);
+    b.onclick = () => { b.dataset.u = b.dataset.u === 'HP' ? 'kW' : 'HP'; b.textContent = b.dataset.u; updPow(i); };
+    i.addEventListener('input', () => updPow(i)); updPow(i);
+  });
   const updWhen = () => root.querySelectorAll('[data-when]').forEach(d => {
     const k = d.dataset.when, el = form.querySelector('#f_' + k);
     const val = el && el.type === 'checkbox' ? String(el.checked) : (form.querySelector(`input[name="${k}"]:checked`)?.value ?? '');
@@ -1004,7 +1072,7 @@ function subOf(col, o) {
   if (col === 'navires') return [o.type, o.longueur != null && o.largeur != null ? `${fmtNum(o.longueur)} × ${fmtNum(o.largeur)} m` : ''].filter(Boolean).join(' · ') || 'Fiche à compléter';
   return [CAT[o.cat], o.secteur].filter(Boolean).join(' · ');
 }
-function openPicker({title, col, onPick, allowNone, defCat}) {
+function openPicker({title, col, onPick, allowNone, defCat, onlyCat}) {
   const sh = $('#sheet');
   sh.innerHTML = `<div class="sheet-bar"><button class="icon-btn" id="shClose" aria-label="Fermer">${ic('close')}</button><h2>${esc(title)}</h2></div>
     <div class="sheet-body"><input id="shQ" type="search" placeholder="Taper un nom…" autocomplete="off" aria-label="Rechercher ou créer"><div id="shCreate" class="create"></div><div id="shList" class="stack"></div></div>`;
@@ -1012,13 +1080,14 @@ function openPicker({title, col, onPick, allowNone, defCat}) {
   if (PWA) { try { history.pushState({sheet:1}, ''); sheetPushed = true; } catch (e) {} }
   const draw = () => {
     const q = $('#shQ').value.trim(), Q = norm(q);
-    const items = [...DB.list(col)].filter(o => !Q || norm(o.nom).includes(Q) || norm(o.secteur).includes(Q)).sort(byName);
+    const items = [...DB.list(col)].filter(o => (!onlyCat || o.cat === onlyCat) && (!Q || norm(o.nom).includes(Q) || norm(o.secteur).includes(Q))).sort(byName);
     const exact = items.some(o => norm(o.nom) === Q);
     $('#shCreate').innerHTML = q && !exact ? (col === 'navires'
       ? `<button class="btn primary block" data-new="navire">${ic('plus')} Créer le navire « ${esc(q)} »</button>`
+      : onlyCat ? `<button class="btn primary block" data-new="${onlyCat}">${ic('plus')} Ajouter « ${esc(q)} »</button>`
       : `<span class="lbl">Créer « ${esc(q)} » comme :</span><div class="seg">${Object.keys(CAT).map(c => `<button class="btn ${c === defCat ? 'primary' : ''}" data-new="${c}">${esc(CAT[c])}</button>`).join('')}</div>`) : '';
     $('#shList').innerHTML = (allowNone && !Q ? `<button class="li" data-pid="">${ic('close')}<span class="li-main"><span class="t">Aucun</span></span></button>` : '')
-      + items.map(o => `<button class="li" data-pid="${o.id}">${ic(col === 'navires' ? 'ship' : (CAT_IC[o.cat] || 'pin'))}<span class="li-main"><span class="t">${esc(o.nom)}</span><span class="s">${esc(subOf(col, o))}</span></span></button>`).join('')
+      + items.map(o => `<button class="li" data-pid="${o.id}">${ic(col === 'navires' ? 'ship' : (CAT_IC[o.cat] || 'pin'))}<span class="li-main"><span class="t">${esc(o.nom)}</span>${onlyCat ? '' : `<span class="s">${esc(subOf(col, o))}</span>`}</span></button>`).join('')
       + (!items.length && !q ? `<p class="empty">Aucune fiche encore. Tapez un nom pour la créer.</p>` : '');
   };
   sh.onclick = e => {
@@ -1161,8 +1230,8 @@ function etaTable(a) {
 const etaDe = (a, c) => { const r = etaTable(a).rows.find(x => x.c === c); return r && r.eta != null ? tFmt(r.eta) : ''; };
 function startAff(id) {
   const a = DB.get('affectations', id); if (!a) return;
-  a.statut = 'route'; if (!a.hDepart) a.hDepart = hhmm(); if (!a.sens) a.sens = guessSens(a);
-  DB.put('affectations', a); toast(`Affectation démarrée · parti à ${a.hDepart}`); go('aff', {id}, {replace: stack[stack.length - 1].view === 'aff'});
+  a.statut = 'route'; if (!a.sens) a.sens = guessSens(a);
+  DB.put('affectations', a); toast('Affectation démarrée'); go('aff', {id}, {replace: stack[stack.length - 1].view === 'aff'});
 }
 function finishAff(id, btn) {
   const a = DB.get('affectations', id); if (!a) return;
@@ -1186,12 +1255,28 @@ function openAppel(type, id) {
   const body = type === 'tracy'
     ? L('TE AV', fmtM(a.teAv)) + L('TE AR', fmtM(a.teAr)) + L('Cargaison', [a.cargo, a.quantite].filter(Boolean).join(' · '), true)
       + L('Contrecœur', a.hConq || etaDe(a, 'CONQ')) + L('Point 2', a.hPt2 || etaDe(a, 'CIP2'))
-    : L('Navire', nav.nom, true) + L('Départ', depNom(a), true) + L('Destination', destNom(a), true) + L('ETA', a.eta ? fmtDate(a.eta, true) : '')
-      + L('Mat. dang.', a.dg || 'aucune', true) + L('TE AV', fmtM(a.teAv)) + L('TE AR', fmtM(a.teAr)) + L('Tirant d\'air', fmtM(tirantAir(nav, a)));
-  openSheet(type === 'tracy' ? 'Appel à Tracy' : 'Appel de départ', `
+    : L('Navire', nav.nom, true) + L('Section de départ', depNom(a), true) + L('Destination', destNom(a), true) + L('ETA', etaTxt(a))
+      + L('Cargo', [a.cargo, a.quantite].filter(Boolean).join(' · '), true) + L('TE arrière', fmtM(a.teAr))
+      + (dgTxt(a) ? L('Mat. dangereuses', dgTxt(a), true) : '');
+  if (type === 'tracy') {
+    openSheet('Appel à Tracy', `
     <div class="readout big accent"><span class="k">Heure</span><span class="v" id="shClock">${hhmm()}</span></div>
     <div class="call">${body}</div>
-    ${type === 'tracy' ? '<p class="sub">Heures prévues : calcul aux points d\'appel (distances à confirmer).</p>' : ''}`);
+    <p class="sub">Heures prévues : calcul aux points d'appel (distances à confirmer).</p>`);
+    return;
+  }
+  openSheet('Appel de départ', `<div class="call">${body}</div>
+    ${a.hDepart ? `<p class="sub">Parti noté : <b>${esc(a.hDepart)}</b></p>` : ''}
+    ${a.statut === 'route' ? '<button class="btn primary block tall" id="apNote">Noter le départ</button>' : ''}
+    <button class="btn block" id="apClose">Fermer</button>`, sh => {
+    sh.querySelector('#apClose').onclick = () => closeSheet(true);
+    const b = sh.querySelector('#apNote'); if (!b) return;
+    const noter = () => {
+      const h = hhmm(); a.hDepart = h; DB.put('affectations', a); closeSheet(true); toast(`Départ noté : ${h}`);
+      setTimeout(() => go('aff', {id}, {replace:true}), 80);
+    };
+    b.onclick = () => { if (a.hDepart) confirmInline(b, `Remplacer ${a.hDepart} par ${hhmm()} ?`, noter, 'Oui, remplacer', true); else noter(); };
+  });
 }
 function navetteBtn(l) {
   const tel = (l && l.navette) || NAVETTE_DEF.tel;
@@ -1218,9 +1303,9 @@ function degagRows(ta, nivOf, liste = DEGAG) {
     return `<div class="verdict ${cls}"><span>${ic} ${esc(d.nom)} : marge ${fmtNum(m)} m${bad ? ' (moins de ' + MARGE_MIN + ' m)' : ''}<small>Hauteur libre ${fmtNum(d.hl)} m${refTxt}${d.gl != null ? ` (verglas ${fmtNum(d.gl)} m : marge ${fmtNum(mg)} m)` : ''}${nivTxt} · tirant d'air ${fmtNum(ta)} m${d.rem ? ' · ' + esc(d.rem) : ''} · ${ATL}, p. ${d.p}</small></span></div>`;
   }).join('');
 }
-const DEGAG_NOTE = `<p class="reg">Tirant d'air = hauteur totale − tirant d'eau arrière. Marge minimale demandée : ${MARGE_MIN} m. Sans niveau d'eau, le résultat reste « à confirmer ». Trois-Rivières-Ouest et Laviolette sont mesurés depuis la PMSGM, à 3,1 m au-dessus du zéro des cartes (${ATL}, p. 94).<span class="src">Aide au calcul — vérifier sur la carte et dans l'ATL 112.</span></p>`;
+const DEGAG_NOTE = `<p class="reg">Tirant d'air = creux (quille → mât) − tirant d'eau arrière. Marge minimale demandée : ${MARGE_MIN} m. Sans niveau d'eau, le résultat reste « à confirmer ». Trois-Rivières-Ouest et Laviolette sont mesurés depuis la PMSGM, à 3,1 m au-dessus du zéro des cartes (${ATL}, p. 94).<span class="src">Aide au calcul — vérifier sur la carte et dans l'ATL 112.</span></p>`;
 function degagHTML(a, ta) {
-  if (ta == null) return `<p class="empty">Entrez la hauteur totale du navire (pilot card) et le tirant d'eau arrière pour calculer le tirant d'air.</p>`;
+  if (ta == null) return `<p class="empty">Entrez le creux (quille → mât) et le tirant d'eau arrière pour calculer le tirant d'air.</p>`;
   return `<div class="stack">${degagRows(ta, st => a.niveaux ? a.niveaux[st] : null, degagDe(a))}</div>${DEGAG_NOTE}`;
 }
 // Photos (carte du pilote, ship particulars) : gardées dans le téléphone (IndexedDB), réduites à 1600 px.
@@ -1359,7 +1444,7 @@ const VIEWS = {
   degagements({h = '', t = '', n = ''}) {
     return {title:'Dégagements aériens', html:`
       <p class="sub">Ponts et câbles de Trois-Rivières à Montréal, avec la Voie maritime et le Richelieu (${ATL}).</p>
-      <div class="grid2"><label class="field"><span class="lbl">Hauteur totale</span><span class="with-unit"><input id="dH" type="text" inputmode="decimal" value="${esc(h)}"><span>m</span></span></label>
+      <div class="grid2"><label class="field"><span class="lbl">Creux (quille → mât)</span><span class="with-unit"><input id="dH" type="text" inputmode="decimal" value="${esc(h)}"><span>m</span></span></label>
         <label class="field"><span class="lbl">TE arrière</span><span class="with-unit"><input id="dT" type="text" inputmode="decimal" value="${esc(t)}"><span>m</span></span></label></div>
       <label class="field"><span class="lbl">Niveau d'eau (facultatif, même pour tous)</span><span class="with-unit"><input id="dN" type="text" inputmode="decimal" value="${esc(n)}"><span>m</span></span></label>
       <div id="dRes" class="stack"></div>
@@ -1371,7 +1456,7 @@ const VIEWS = {
           const H = parseNum(r.querySelector('#dH').value), T = parseNum(r.querySelector('#dT').value), N = parseNum(r.querySelector('#dN').value);
           stack[stack.length - 1].params = {h:r.querySelector('#dH').value, t:r.querySelector('#dT').value, n:r.querySelector('#dN').value};
           const out = r.querySelector('#dRes');
-          if (H == null || T == null || Number.isNaN(H) || Number.isNaN(T)) { out.innerHTML = '<p class="empty">Entrez la hauteur totale (pilot card) et le tirant d\'eau arrière.</p>'; return; }
+          if (H == null || T == null || Number.isNaN(H) || Number.isNaN(T)) { out.innerHTML = '<p class="empty">Entrez le creux (quille → mât) et le tirant d\'eau arrière.</p>'; return; }
           const ta = r2(H - T);
           out.innerHTML = `<div class="readout accent"><span class="k">Tirant d'air</span><span class="v">${fmtNum(ta)} m</span></div>` + degagRows(ta, () => (N == null || Number.isNaN(N)) ? null : N);
         };
@@ -1420,10 +1505,10 @@ const VIEWS = {
     const n = DB.get('navires', id); if (!n) return VIEWS.notFound();
     const u = usage('navire', id), items = itemsFor({navireId:id}).sort(sortBrief);
     const rows = [
-      {k:'Longueur', v:fmtM(n.longueur)}, {k:'Largeur', v:fmtM(n.largeur)}, {k:'Creux', v:fmtM(n.creux)}, {k:'Hauteur totale', v:fmtM(n.hauteur)},
-      {k:'Gouvernail', v:n.gouvernail}, {k:'Recul', v:n.recul != null ? fmtNum(n.recul) + ' %' : ''},
+      {k:'Longueur', v:fmtM(n.longueur)}, {k:'Largeur', v:fmtM(n.largeur)}, {k:'Creux (quille → mât)', v:fmtM(n.hauteur)}, ...(n.creux != null ? [{k:'Ancien creux', v:fmtM(n.creux)}] : []),
+      {k:'Gouvernail', v:n.gouvernail}, {k:'Recul', v:n.reculP ? powHP(n.reculP) : n.recul != null ? fmtNum(n.recul) + ' %' : ''},
       {k:'Hélice', v:n.helice}, {k:'Rotation', v:n.rotation ? 'À ' + n.rotation : ''},
-      {k:'BT (étrave)', v:n.bt}, {k:'ST (poupe)', v:n.st}, {k:'Bittes (SWL)', v:n.swl != null && n.swl !== '' ? fmtNum(firstNum(n.swl)) + ' t' : ''}, {k:'Puissance', v:n.puissance},
+      {k:'Prop. avant', v:powHP(n.bt)}, {k:'Prop. arrière', v:powHP(n.st)}, {k:'Bittes (SWL)', v:n.swl != null && n.swl !== '' ? fmtNum(firstNum(n.swl)) + ' t' : ''}, {k:'Moteur', v:powHP(n.puissance)},
       {k:'Effet transversal', v:n.effetTransversal, full:true, txt:true}, {k:'Marche arrière', v:n.marcheArriere, full:true, txt:true},
       {k:'Réponse à la barre', v:n.gouvNote, full:true, txt:true}, ...(n.notes ? [{k:'Particularités', v:n.notes, full:true, txt:true}] : [])
     ];
@@ -1590,16 +1675,17 @@ const VIEWS = {
     const nav = DB.get('navires', a.navireId) || {};
     const vals = {...a, depart:{autre:a.departAutre, id:a.departId, txt:a.departTxt}, dest:{autre:a.destAutre || a.destMode === 'mer', id:a.destId, txt:a.destTxt}};
     NAV_KEYS.forEach(k => vals['n_' + k] = nav[k]);
-    if (vals.n_stOn == null && nav.st) vals.n_stOn = true;
-    return {title:id ? 'Modifier la fiche' : 'Nouvelle affectation', action:saveAction, html:formHTML(AFF_F, vals, !!id),
+    if (a.eta && a.eta.includes('T')) { vals.eta = a.eta.slice(0, 10); vals.etaAP = a.etaAP || etaAPde(a.eta); }
+    const prep = !id || a.statut === 'prep', CHAMPS = prep ? AFF_F.filter(f => !f.later) : AFF_F;
+    return {title:id ? 'Modifier la fiche' : 'Nouvelle affectation', action:saveAction, html:formHTML(CHAMPS, vals, !!id),
       mount: r => {
-        mountForm(r, AFF_F, {
+        mountForm(r, CHAMPS, {
           delMsg:'Supprimer cette fiche ? Les compteurs seront recalculés.',
           onPick: (k, pid, form) => {
             if (k !== 'navireId' || !pid) return;
             const n = DB.get('navires', pid) || {};
             NAV_KEYS.forEach(key => { const el = form.querySelector('#f_n_' + key); if (!el) return;
-              if (el.type === 'checkbox') { el.checked = !!(n[key] ?? n.st); return; }
+              if (el.parentNode.classList.contains('powf')) { setPow(el, n[key]); return; }
               const val = n[key] == null ? '' : String(n[key]).replace('.', ',');
               if (el.tagName === 'SELECT' && val && ![...el.options].some(o => o.value === val)) el.add(new Option(val, val));
               el.value = val; });
@@ -1610,7 +1696,8 @@ const VIEWS = {
             if (nb || u.count) toast(`${u.count ? `Déjà piloté ${u.count} fois` : ''}${u.count && nb ? ' · ' : ''}${nb ? `${nb} note${nb > 1 ? 's' : ''} : voir « Notes de manœuvre »` : ''}`);
           },
           onSubmit: o => {
-            const navUpd = {}; NAV_KEYS.forEach(k => { const v = o['n_' + k]; delete o['n_' + k]; if (v !== '' && v != null) navUpd[k] = v; });
+            const navUpd = {}; NAV_KEYS.forEach(k => { const v = o['n_' + k]; delete o['n_' + k]; if (v !== undefined) navUpd[k] = v === '' ? null : v; });
+            if (a.eta && a.eta.includes('T') && o.eta === a.eta.slice(0, 10) && o.etaAP === (a.etaAP || etaAPde(a.eta))) o.eta = a.eta;
             const n = DB.get('navires', o.navireId);
             if (n) DB.put('navires', {...n, ...navUpd, ...(o.teAv != null ? {dernierTeAv:o.teAv} : {}), ...(o.teAr != null ? {dernierTeAr:o.teAr} : {})});
             if (o.cargo && !liste('cargo').some(c => norm(c) === norm(o.cargo))) { DB.d.reglages.listes.cargo.push(o.cargo); }
@@ -1624,11 +1711,26 @@ const VIEWS = {
         const fTA = () => {
           const g = k => parseNum(r.querySelector('#f_' + k).value), h = g('n_hauteur'), t = g('teAr');
           const el = r.querySelector('#calc_ta');
-          if (h == null || Number.isNaN(h) || t == null || Number.isNaN(t)) { el.className = 'verdict unk'; el.innerHTML = 'Tirant d\'air : entrez la hauteur totale et le TE arrière'; return; }
+          if (h == null || Number.isNaN(h) || t == null || Number.isNaN(t)) { el.className = 'verdict unk'; el.innerHTML = 'Tirant d\'air : entrez le creux et le TE arrière'; return; }
           el.className = 'verdict';
-          el.innerHTML = `Tirant d'air : ${fmtNum(r2(h - t))} m<small>Hauteur ${fmtNum(h)} − TE arrière ${fmtNum(t)} m · ponts et câbles du trajet : voir la fiche enregistrée</small>`;
+          el.innerHTML = `Tirant d'air : ${fmtNum(r2(h - t))} m<small>Creux ${fmtNum(h)} − TE arrière ${fmtNum(t)} m · ponts et câbles du trajet : voir la fiche enregistrée</small>`;
         };
         r.querySelector('#frm').addEventListener('input', fTA); fTA();
+        const vEl = r.querySelector('#f_vitesse'), VD = {montant:10, descendant:14};
+        const sensOn = r.querySelector('input[name="sens"]:checked');
+        if (sensOn && !vEl.value) vEl.value = VD[sensOn.value];
+        r.querySelectorAll('input[name="sens"]').forEach(i => i.addEventListener('change', () => {
+          const cur = parseNum(vEl.value); if (cur == null || Object.values(VD).includes(cur)) vEl.value = VD[i.value];
+        }));
+        const mEl = r.querySelector('#f_meteo'), mBtn = document.createElement('button');
+        mBtn.type = 'button'; mBtn.className = 'btn block'; mBtn.textContent = 'Actualiser la météo';
+        mEl.closest('.field').after(mBtn);
+        const chargeMeteo = force => meteoMTR().then(t => {
+          if (mEl.isConnected && (force || !mEl.value.trim())) mEl.value = t;
+          if (force) toast('Météo à jour');
+        }).catch(() => { if (force) toast('Météo indisponible : entrez-la à la main.'); });
+        mBtn.onclick = () => chargeMeteo(true);
+        if (prep && !mEl.value.trim()) chargeMeteo(false);
       }};
   },
   aff({id}) {
@@ -1659,12 +1761,13 @@ const VIEWS = {
       ${reglesFiche(a, nav, dest).map(regHTML).join('')}
       ${ancVerdictHTML(dest, a, nav)}
       ${a.teAv != null && a.teAr != null && a.teAv > a.teAr ? `<div class="verdict bad">⚠ Navire sur le nez : TE AV ${fmtM(a.teAv)} > TE AR ${fmtM(a.teAr)}</div>` : ''}
-      <div class="rpt"><h3>Navire — fixe</h3><div class="kv">${KV('L', fmtM(nav.longueur))}${KV('B', fmtM(nav.largeur))}${KV('Creux', fmtM(nav.creux))}${KV('Haut.', fmtM(nav.hauteur))}
-        ${KV('Type', nav.type)}${KV('BT', nav.bt)}${KV('ST', nav.stOn || nav.st ? (nav.st || 'oui') : '')}${KV('Recul', nav.recul != null ? fmtNum(nav.recul) + ' %' : '')}
+      <div class="rpt"><h3>Navire — fixe</h3><div class="kv">${KV('L', fmtM(nav.longueur))}${KV('B', fmtM(nav.largeur))}${KV('Creux', fmtM(nav.hauteur))}
+        ${KV('Type', nav.type)}${KV('Prop. AV', powHP(nav.bt))}${KV('Prop. AR', nav.st ? powHP(nav.st) : nav.stOn ? 'oui' : '')}${KV('Moteur', powHP(nav.puissance))}${KV('Recul', nav.reculP ? powHP(nav.reculP) : nav.recul != null ? fmtNum(nav.recul) + ' %' : '')}
         ${KV('Bittes', nav.swl != null && nav.swl !== '' ? fmtNum(firstNum(nav.swl)) + ' t' : '')}${KV('Gouv.', nav.gouvernail)}</div></div>
-      <div class="rpt"><h3>Voyage</h3><div class="kv">${KT('De', depNom(a))}${KT('Vers', destNom(a))}${KV('ETA', a.eta ? fmtDate(a.eta, true) : '')}
-        ${KT('Cargo', [a.cargo, a.quantite].filter(Boolean).join(' · '))}${KT('DG', a.dg)}${KV('TE AV', fmtM(a.teAv))}${KV('TE AR', fmtM(a.teAr))}${KV('T. d\'air', fmtM(ta))}
-        ${KT('Agent', a.agent)}${KT('Météo', a.meteo)}</div></div>
+      <div class="rpt"><h3>Voyage</h3><div class="kv">${KT('De', depNom(a))}${KT('Vers', destNom(a))}${KV('ETA', etaTxt(a))}
+        ${KT('Cargo', [a.cargo, a.quantite].filter(Boolean).join(' · '))}${KT('DG', dgTxt(a))}${KV('TE AV', fmtM(a.teAv))}${KV('TE AR', fmtM(a.teAr))}${KV('T. d\'air', fmtM(ta))}
+        ${KT('Agent', a.agent)}</div></div>
+      ${a.meteo ? `<div class="info"><b>Météo</b><br>${esc(a.meteo).replace(/\n/g, '<br>')}</div>` : ''}
       <div class="rpt"><h3>Temps</h3><div class="kv">${KV('Affecté', fmtDate(a.date, true))}${KV('Parti', a.hDepart)}${KV('Débarqué', a.hDebarque)}${KV('Trajet', traj != null ? dureeFmt(traj) : '')}
         ${KV('Tugs', a.hTugs)}${KV('Linesmen', a.hLines)}${a.releve ? KV('Relève', a.hReleve || 'oui') : ''}${pasTxt}</div></div>
       <h2 class="sec">Remorqueurs et bittes</h2>
@@ -1776,7 +1879,7 @@ const VIEWS = {
     const n = DB.get('navires', navireId);
     if (n) {
       const u = usage('navire', n.id);
-      const facts = [n.longueur != null && `L ${fmtM(n.longueur)}`, n.largeur != null && `B ${fmtM(n.largeur)}`, n.helice, n.bt && `BT ${n.bt}`, n.st && `ST ${n.st}`, `Piloté ${u.count} fois`].filter(Boolean);
+      const facts = [n.longueur != null && `L ${fmtM(n.longueur)}`, n.largeur != null && `B ${fmtM(n.largeur)}`, n.helice, n.bt && `Prop. AV ${powHP(n.bt)}`, n.st && `Prop. AR ${powHP(n.st)}`, `Piloté ${u.count} fois`].filter(Boolean);
       secs.push(section('Navire', 'navire', n, itemsFor({navireId:n.id}).sort(sortBrief), `<div class="chips">${facts.map(f => `<span class="chip static">${esc(f)}</span>`).join('')}</div>`, {hideNavire:true}));
     }
     const lieuSec = (label, lid) => {
@@ -1791,7 +1894,7 @@ const VIEWS = {
     const cnt = t => all.filter(x => x.kind !== 'manoeuvre' && x.ton === t).length;
     const nm = all.filter(x => x.kind === 'manoeuvre').length;
     return {title:'Notes de manœuvre', html:`
-      ${a ? `<div class="sub">${esc(n ? n.nom : '')} · ${fmtDate(a.date, true)}</div>` : ''}
+      ${a ? `<div class="sub">${esc(n ? n.nom : '')} · ${fmtDate(a.date, true)}</div>${a.meteo ? `<div class="info"><b>Météo</b><br>${esc(a.meteo).replace(/\n/g, '<br>')}</div>` : ''}` : ''}
       <div class="brief-sum"><span class="tag t-neg">${pl(cnt('neg'), 'négatif', 'négatifs')}</span><span class="tag t-conseil">${pl(cnt('conseil'), 'conseil', 'conseils')}</span><span class="tag t-pos">${pl(cnt('pos'), 'positif', 'positifs')}</span><span class="tag t-man">${pl(nm, 'manœuvre', 'manœuvres')}</span></div>
       ${secs.join('') || '<p class="empty">Choisissez un navire et un quai dans l\'affectation pour voir le briefing.</p>'}
       ${a ? `<div class="row"><button class="btn primary" data-go="manEdit" data-aff-id="${a.id}">${ic('plus')} Manœuvre</button><button class="btn" data-go="noteEdit" data-aff-id="${a.id}">${ic('plus')} Note</button></div>` : ''}`};
