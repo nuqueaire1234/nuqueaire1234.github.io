@@ -364,7 +364,7 @@ a.li{text-decoration:none;color:inherit}
 <script>
 (() => {
 'use strict';
-const VERSION = 'v0.16 · nouvelle fiche d\'affectation (23 nov. 2026)';
+const VERSION = 'v0.17 · niveaux d\'eau automatiques (23 nov. 2026)';
 const PWA = !!window.MPP_PWA;
 
 /* ---------- Utilitaires ---------- */
@@ -446,6 +446,44 @@ function vitessePermise(type, largeur, dsq) {
   return {v, row, req7:req[0], msg: v == null ? `Sous le minimum du tableau (${fmtNum(req[0])} m requis à 7 nœuds)` : ''};
 }
 const STATIONS = [['TRV','Trois-Rivières'],['LSP','Lac Saint-Pierre'],['SOR','Sorel'],['CONQ','Contrecœur'],['VAR','Varennes'],['MTL','Montréal']];
+// Niveaux d'eau officiels (Service hydrographique du Canada, API SINE). Montréal = Jetée #1 (station 15520).
+const SINE = 'https://api-sine.dfo-mpo.gc.ca/api/v1/stations/';
+const SINE_ID = {TRV:'5cebf1df3d0f4a073c4bbbac', LSP:'5cebf1e03d0f4a073c4bbe49', SOR:'5cebf1e03d0f4a073c4bbe32', CONQ:'5cebf1e03d0f4a073c4bbe1b', VAR:'5cebf1e03d0f4a073c4bbe04', MTL:'5cebf1e03d0f4a073c4bbdd7'};
+const NIV_VIEUX = 30; // minutes
+const isoZ = ms => new Date(ms).toISOString().replace(/\.\d+Z$/, 'Z');
+const hLoc = ms => { const d = new Date(ms); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+async function sineSerie(code, serie, de, a) {
+  const c = new AbortController(), to = setTimeout(() => c.abort(), 10000);
+  try {
+    const res = await fetch(`${SINE}${SINE_ID[code]}/data?time-series-code=${serie}&from=${isoZ(de)}&to=${isoZ(a)}`, {signal:c.signal});
+    if (!res.ok) throw new Error('niveau');
+    const j = await res.json();
+    // Drapeaux 3 et 4 = valeur douteuse ou mauvaise : jamais retenue.
+    return j.filter(x => Number.isFinite(x.value) && !['3', '4'].includes(String(x.qcFlagCode))).map(x => ({v:Math.round(x.value * 100) / 100, t:Date.parse(x.eventDate)}));
+  } finally { clearTimeout(to); }
+}
+// cible = null : dernière mesure (30 min max). Sinon : prévision SPINE la plus proche (5 min max).
+async function sineNiveaux(cible) {
+  const vals = {}, ko = [], now = Date.now();
+  for (const [c, nm] of STATIONS) {
+    try {
+      const L = cible == null ? await sineSerie(c, 'wlo', now - NIV_VIEUX * 60000, now) : await sineSerie(c, 'wlf-spine', cible - 300000, cible + 300000);
+      const x = cible == null ? L[L.length - 1] : [...L].sort((m, n) => Math.abs(m.t - cible) - Math.abs(n.t - cible))[0];
+      if (x) vals[c] = x; else ko.push(nm);
+    } catch (e) { ko.push(nm); }
+    await new Promise(r => setTimeout(r, 250));
+  }
+  return {vals, ko};
+}
+function nivInfoHTML(a) {
+  const s = a.niveauxSrc; if (!s) return '';
+  const age = Math.round((Date.now() - s.t) / 60000), jour = s.cible && new Date(s.cible).toDateString() !== new Date().toDateString() ? fmtDate(new Date(s.cible - new Date(s.cible).getTimezoneOffset() * 60000).toISOString().slice(0, 10)) + ' ' : '';
+  const quoi = s.type === 'mesure' ? `Mesuré à ${hLoc(s.t)}` : `Prévision SPINE pour ${jour}${hLoc(s.cible)}`;
+  const vieux = s.type === 'mesure' ? age > NIV_VIEUX : Date.now() - s.lu > 6 * 3600000;
+  const alerte = vieux ? `⚠ Lecture ancienne (${s.type === 'mesure' ? age + ' min' : 'plus de 6 h'}) : à relire. ` : '';
+  return `<div class="verdict ${vieux || (s.ko && s.ko.length) ? 'bad' : 'unk'}">${esc(alerte + quoi)}${s.manuel ? ' · modifié à la main' : ''}
+    <small>${s.ko && s.ko.length ? `Non lu : ${esc(s.ko.join(', '))} (ancienne valeur conservée). ` : ''}Service hydrographique du Canada, données non révisées. Zéro de référence à confirmer.</small></div>`;
+}
 const CHENAL = 11.3; // profondeur minimale du chenal jusqu'à M177 (Port de Montréal, P&P 2025-06-20, 2.1.1)
 const REG_SRC = 'Port de Montréal — Pratiques et procédures, éd. 2025-06-20, section 2.1.1';
 const firstNum = s => { const m = String(s ?? '').replace(',', '.').match(/-?\d+(\.\d+)?/); return m ? Number(m[0]) : null; };
@@ -1774,6 +1812,9 @@ const VIEWS = {
       ${tugs.length ? tugs.map(([pos, tid]) => tugHTML(pos, DB.get('lieux', tid), nav)).join('') : '<p class="empty">Aucun remorqueur choisi.</p>'}
       <h2 class="sec">Niveaux d'eau, DSQ et vitesse permise</h2>
       <p class="sub">TE retenu : <b>${tm != null ? fmtM(tm) : '—'}</b> (le plus grand) · Largeur ${fmtM(nav.largeur) || '—'} · Tableau ${typ === 'pc' ? 'porte-conteneurs' : 'autres navires'}</p>
+      <button class="btn primary block" id="nivDirect">Niveaux en direct</button>
+      <div class="timef"><input id="nivH" type="text" inputmode="numeric" placeholder="hhmm" autocomplete="off" aria-label="Heure de la prévision"><button class="btn" id="nivPrev">Prévision SPINE</button></div>
+      <div id="nivInfo">${nivInfoHTML(a)}</div>
       <div class="st-table" id="stTable">${STATIONS.map(([c, nm]) => `<div class="st-row"><span class="n">${esc(nm)}</span>
         <input data-st="${c}" type="text" inputmode="decimal" placeholder="niv. m" aria-label="Niveau d'eau ${esc(nm)}" value="${a.niveaux && a.niveaux[c] != null ? esc(String(a.niveaux[c]).replace('.', ',')) : ''}">
         <span class="r" id="res_${c}"></span></div>`).join('')}</div>
@@ -1813,9 +1854,32 @@ const VIEWS = {
         r.querySelectorAll('[data-st]').forEach(inp => inp.onchange = () => {
           const v = parseNum(inp.value); a.niveaux = a.niveaux || {};
           if (v == null) delete a.niveaux[inp.dataset.st]; else if (Number.isNaN(v)) { toast('Niveau invalide (ex. 0,35 ou -0,20)'); return; } else a.niveaux[inp.dataset.st] = v;
-          a.niveauxH = nowLocal(); save(); recalc();
+          a.niveauxH = nowLocal(); if (a.niveauxSrc) a.niveauxSrc.manuel = true; save(); recalc(); r.querySelector('#nivInfo').innerHTML = nivInfoHTML(a);
         });
         recalc();
+        const bD = r.querySelector('#nivDirect'), bP = r.querySelector('#nivPrev');
+        const lire = async (cible, b) => {
+          const txt = b.textContent; bD.disabled = bP.disabled = true; b.textContent = 'Lecture…';
+          const {vals, ko} = await sineNiveaux(cible);
+          bD.disabled = bP.disabled = false; b.textContent = txt;
+          const cles = Object.keys(vals);
+          if (!cles.length) { toast('Niveaux indisponibles : entrez-les à la main.'); return; }
+          a.niveaux = a.niveaux || {};
+          cles.forEach(c => { a.niveaux[c] = vals[c].v; const i = r.querySelector(`[data-st="${c}"]`); if (i) i.value = String(vals[c].v).replace('.', ','); });
+          a.niveauxH = nowLocal();
+          a.niveauxSrc = {type:cible == null ? 'mesure' : 'spine', t:Math.min(...cles.map(c => vals[c].t)), cible, lu:Date.now(), ko};
+          save(); recalc(); if (r.isConnected) r.querySelector('#nivInfo').innerHTML = nivInfoHTML(a);
+          toast(ko.length ? `${cles.length} stations lues sur ${STATIONS.length}` : 'Niveaux à jour');
+        };
+        bD.onclick = () => lire(null, bD);
+        bP.onclick = () => {
+          const h = parseTime(r.querySelector('#nivH').value);
+          if (!h) { toast('Entrez l\'heure de passage (ex. 1630)'); r.querySelector('#nivH').focus(); return; }
+          r.querySelector('#nivH').value = h;
+          const d = new Date(); d.setHours(+h.slice(0, 2), +h.slice(3), 0, 0);
+          if (d.getTime() < Date.now() - 1800000) d.setDate(d.getDate() + 1); // heure passée = demain
+          lire(d.getTime(), bP);
+        };
         r.querySelector('#evAdd').onclick = () => {
           const h = parseTime(r.querySelector('#evH').value), t = r.querySelector('#evT').value.trim();
           if (h === null || !h) { toast('Heure invalide (ex. 0630)'); return; } if (!t) { toast('Écrivez l\'événement'); return; }
