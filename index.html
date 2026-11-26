@@ -258,6 +258,10 @@ textarea{min-height:120px;resize:vertical;line-height:1.45}
 .manv div{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
 .manv span{font-size:15px}
 .manv b{font-size:22px;text-align:right;overflow-wrap:anywhere}
+.manv .rv b{font-size:17px}
+.manv .rv small{display:block;color:var(--muted);font-size:13px;letter-spacing:0;text-transform:none;font-weight:400}
+.dot{display:inline-block;width:14px;height:14px;border-radius:50%;margin:0 6px 0 10px;vertical-align:-1px;box-sizing:border-box}
+.dot.vert{background:var(--pos)}.dot.rouge{border:3px solid var(--neg)}.dot.gris{border:2px dashed var(--muted)}
 #f_meteo{min-height:120px}
 .chk{display:flex;align-items:center;gap:12px;min-height:52px;padding:0 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface);font-weight:600}
 .chk input{width:24px;height:24px;accent-color:var(--accent)}
@@ -371,7 +375,7 @@ a.li{text-decoration:none;color:inherit}
 <script>
 (() => {
 'use strict';
-const VERSION = 'v0.18 · fiche allégée et manœuvre en évidence (23 nov. 2026)';
+const VERSION = 'v0.19 · résumé vitesse et dégagements, CIP, appel APL (26 nov. 2026)';
 const PWA = !!window.MPP_PWA;
 
 /* ---------- Utilitaires ---------- */
@@ -421,6 +425,7 @@ const ICON = {
   gear:'<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>',
   eye:'<path d="M2 12s3.8-6.5 10-6.5S22 12 22 12s-3.8 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/>',
   bridge:'<path d="M2 17h20"/><path d="M3 17c2.5-7 15.5-7 18 0"/><path d="M7.5 17v-4M12 17v-5.5M16.5 17v-4"/>',
+  vhf:'<path d="M8.5 7.5V2.5"/><rect x="6.5" y="7.5" width="11" height="14" rx="2.5"/><rect x="9" y="10" width="6" height="3.5" rx="1"/><path d="M9.5 16.5h5M9.5 19h5"/>',
   wheel:'<circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="1.8"/><path d="M12 2.5v7.7M12 13.8v7.7M2.5 12h7.7M13.8 12h7.7"/>'
 };
 const ic = (n, cls = '') => `<svg class="ico ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n] || ''}</svg>`;
@@ -545,7 +550,7 @@ const segKey = (a, b) => SEG[a + '-' + b] != null ? a + '-' + b : b + '-' + a;
 // zc = hauteur de la référence au-dessus du zéro des cartes (PMSGM à Trois-Rivières : 3,1 m). Sans zc : hauteur rapportée au zéro des cartes.
 // si = obstacle affiché sur la fiche seulement pour ce trajet. gl = sous verglas.
 const ATL = 'ATL 112 (éd. 2025-05)';
-const MARGE_MIN = 1; // Marge minimale demandée par le pilote (22 nov. 2026)
+const MARGE_MIN = 1; // Marge minimale demandée par le pilote : dégagement aérien (22 nov. 2026) et DSQ (26 nov. 2026)
 const DEGAG = [
   {nom:'Câble, Trois-Rivières-Ouest', hl:50, gl:37, zc:3.1, ref:'PMSGM', st:'TRV', p:94},
   {nom:'Pont Laviolette (limites du chenal)', hl:48, zc:3.1, ref:'PMSGM', rem:'49 m au centre du chenal, 225 m de large', st:'TRV', p:94},
@@ -873,17 +878,20 @@ const AFF_F = [
   {k:'n_gouvernail', label:'Gouvernail', type:'selList', list:'gouvernail', half:true},
   {sec:'Voyage — données du jour'},
   {k:'depart', label:'Départ', type:'quaiSel'},
-  {k:'dest', label:'Destination', type:'quaiSel'},
-  {k:'eta', label:'ETA à destination', type:'date', half:true},
-  {k:'etaAP', label:'AM / PM', type:'seg', opts:[['AM','AM'],['PM','PM']], half:true},
-  {k:'cargo', label:'Cargaison', type:'datalist', list:'cargo', half:true},
-  {k:'quantite', label:'Quantité', type:'text', half:true},
-  {k:'dg', label:'Matières dangereuses', type:'text', half:true},
-  {k:'dgQte', label:'Quantité', type:'text', half:true},
+  {k:'sens', label:'Sens', type:'seg', opts:[['montant','Montant'],['descendant','Descendant']], half:true, wide:true},
+  {k:'vitesse', label:'Vitesse', type:'num', unit:'nd', half:true},
   {k:'teAv', label:'Tirant d\'eau AV', type:'num', unit:'m', half:true},
   {k:'teAr', label:'Tirant d\'eau AR', type:'num', unit:'m', half:true},
-  {k:'agent', label:'Agent', type:'text'},
   {k:'meteo', label:'Météo', type:'textarea', hint:'Montréal à Trois-Rivières. Rempli automatiquement, modifiable.'},
+  {sec:'Destination et cargaison', later:true},
+  {k:'dest', label:'Destination', type:'quaiSel', later:true},
+  {k:'eta', label:'ETA à destination', type:'date', half:true, later:true},
+  {k:'etaAP', label:'AM / PM', type:'seg', opts:[['AM','AM'],['PM','PM']], half:true, later:true},
+  {k:'cargo', label:'Cargaison', type:'datalist', list:'cargo', half:true, later:true},
+  {k:'quantite', label:'Quantité', type:'text', half:true, later:true},
+  {k:'dg', label:'Matières dangereuses', type:'text', half:true, later:true},
+  {k:'dgQte', label:'Quantité', type:'text', half:true, later:true},
+  {k:'agent', label:'Agent', type:'text', later:true},
   {sec:'Temps', later:true},
   {k:'hDepart', label:'Parti', type:'time', later:true},
   {k:'hDebarque', label:'Débarqué', type:'time', later:true},
@@ -894,11 +902,8 @@ const AFF_F = [
   {sec:'Remorqueurs', later:true},
   {k:'tugAvId', label:'Remorqueur avant', type:'pick', col:'lieux', defCat:'remorqueur', onlyCat:'remorqueur', later:true},
   {k:'tugArId', label:'Remorqueur arrière', type:'pick', col:'lieux', defCat:'remorqueur', onlyCat:'remorqueur', later:true},
-  {sec:'Heures aux points d\'appel'},
-  {k:'sens', label:'Sens', type:'seg', opts:[['montant','Montant'],['descendant','Descendant']], half:true, wide:true},
-  {k:'vitesse', label:'Vitesse', type:'num', unit:'nd', half:true},
-  {sec:'Compteur'},
-  {k:'stretchId', label:'Stretch de cette fiche', type:'selkv', opts:() => [['', '— aucun —'], ...stretchesSorted().reverse().map(s => [s.id, stretchLabel(s) + (s === currentStretch() ? ' (en cours)' : '')])], hint:'Pour corriger un oubli de remise à zéro : choisissez l\'autre stretch.'}
+  {sec:'Compteur', later:true},
+  {k:'stretchId', label:'Stretch de cette fiche', type:'selkv', opts:() => [['', '— aucun —'], ...stretchesSorted().reverse().map(s => [s.id, stretchLabel(s) + (s === currentStretch() ? ' (en cours)' : '')])], hint:'Pour corriger un oubli de remise à zéro : choisissez l\'autre stretch.', later:true}
 ];
 const liste = k => DB.d.reglages.listes[k] || [];
 function quaisDe(reg) {
@@ -1341,6 +1346,29 @@ function degagRows(ta, nivOf, liste = DEGAG) {
     const nivTxt = has ? ` · niveau ${fmtNum(nv)} m (${d.st})` : ' · niveau d\'eau non entré : à confirmer';
     return `<div class="verdict ${cls}"><span>${ic} ${esc(d.nom)} : marge ${fmtNum(m)} m${bad ? ' (moins de ' + MARGE_MIN + ' m)' : ''}<small>Hauteur libre ${fmtNum(d.hl)} m${refTxt}${d.gl != null ? ` (verglas ${fmtNum(d.gl)} m : marge ${fmtNum(mg)} m)` : ''}${nivTxt} · tirant d'air ${fmtNum(ta)} m${d.rem ? ' · ' + esc(d.rem) : ''} · ${ATL}, p. ${d.p}</small></span></div>`;
   }).join('');
+}
+function resumeVitHTML(a, nav, tm, typ, ta) {
+  const up = (a.sens || guessSens(a)) === 'montant', vPrev = a.vitesse || (up ? 10 : 14);
+  const D = c => `<i class="dot ${c}"></i>`;
+  const lignes = STATIONS.map(([c, nm]) => {
+    const nv = a.niveaux ? a.niveaux[c] : null;
+    if (nv == null || tm == null) return `<div class="rv"><span>${esc(nm)}</span><b>${D('gris')}${tm == null ? 'TE ?' : 'niveau ?'}</b></div>`;
+    const dsq = r2(CHENAL + nv - tm), vp = vitessePermise(typ, nav.largeur, dsq);
+    const vTxt = vp.v != null ? vp.v + ' nd' : nav.largeur == null ? 'largeur ?' : nav.largeur > 44 ? 'hors tableau' : 'moins de 7 nd';
+    return `<div class="rv"><span>${esc(nm)}</span><b>DSQ ${fmtNum(dsq)} m${D(dsq >= MARGE_MIN ? 'vert' : 'rouge')}${vTxt}${D(vp.v != null && vp.v >= vPrev ? 'vert' : 'rouge')}</b></div>`;
+  });
+  let air;
+  if (ta == null) air = `<b>${D('gris')}tirant d'air ?</b>`;
+  else {
+    const L = degagDe(a).map(d => { const nv = a.niveaux ? a.niveaux[d.st] : null; return {nom:d.nom, has:nv != null, m:r2(d.hl + (nv != null ? (d.zc || 0) - nv : 0) - ta)}; });
+    const pire = [...L].sort((x, y) => x.m - y.m)[0], bad = L.some(x => x.m < MARGE_MIN), inc = L.some(x => !x.has);
+    air = pire ? `<b>${fmtNum(pire.m)} m${D(bad ? 'rouge' : inc ? 'gris' : 'vert')}<small>${esc(pire.nom)}${inc && !bad ? ' · niveau manquant' : ''}</small></b>` : `<b>aucun obstacle</b>`;
+  }
+  return `<h3>Résumé vitesse et dégagements</h3>
+    <div class="rv"><span>Vitesse prévue</span><b>${fmtNum(vPrev)} nd · ${up ? 'montant' : 'descendant'}</b></div>
+    ${lignes.join('')}
+    <div class="rv"><span>Dégagement aérien le plus serré</span>${air}</div>
+    <p class="sub" style="margin:0">Rond vert : DSQ et air d'au moins ${MARGE_MIN} m, vitesse permise au moins égale à la vitesse prévue (vitesse sur l'eau). Anneau rouge : à vérifier. Pointillé : donnée manquante.</p>`;
 }
 const DEGAG_NOTE = `<p class="reg">Tirant d'air = creux (quille → mât) − tirant d'eau arrière. Marge minimale demandée : ${MARGE_MIN} m. Sans niveau d'eau, le résultat reste « à confirmer ». Trois-Rivières-Ouest et Laviolette sont mesurés depuis la PMSGM, à 3,1 m au-dessus du zéro des cartes (${ATL}, p. 94).<span class="src">Aide au calcul — vérifier sur la carte et dans l'ATL 112.</span></p>`;
 function degagHTML(a, ta) {
@@ -1788,10 +1816,11 @@ const VIEWS = {
     const acts = st === 'prep'
       ? `<button class="btn primary block tall" data-start="${id}">▶ Démarrer l'affectation</button>`
       : st === 'route'
-        ? `<div class="row"><button class="btn primary tall" data-appel="depart" data-id="${id}">📻 Appel de départ</button><button class="btn tall" data-go="heures" data-id="${id}">⏱ Heures aux points</button></div>
-          ${versLambert(a) ? `<button class="btn block" data-appel="tracy" data-id="${id}">📻 Appel à Tracy (Voie maritime)</button>` : ''}
+        ? `<div class="row"><button class="btn primary tall" data-appel="depart" data-id="${id}">${ic('vhf')} Appel de départ</button><button class="btn tall" data-go="heures" data-id="${id}">⏱ CIP</button></div>
+          ${versLambert(a) ? `<button class="btn block" data-appel="tracy" data-id="${id}">${ic('vhf')} Appel à Tracy (Voie maritime)</button>` : ''}
+          ${TELS.lpa ? `<a class="btn block tall" href="${esc(telHref(TELS.lpa))}">${ic('phone')} Appeler l'APL (dispatch)</a>` : `<button class="btn block tall" data-notel="1">${ic('phone')} Appeler l'APL (dispatch)</button>`}
           <div class="row">${navetteBtn(dest)}<button class="btn" data-finish="${id}">⚓ Débarqué</button></div>`
-        : `<div class="row"><button class="btn" data-go="heures" data-id="${id}">⏱ Heures aux points</button><button class="btn" data-appel="depart" data-id="${id}">📻 Résumé</button></div>`;
+        : `<div class="row"><button class="btn" data-go="heures" data-id="${id}">⏱ CIP</button><button class="btn" data-appel="depart" data-id="${id}">${ic('vhf')} Résumé</button></div>`;
     return {title:nav.nom || 'Fiche navire', action:{label:'Modifier', icon:'edit', fn:() => go('affEdit', {id})}, html:`
       <div class="sub"><b>${ST[st]}</b> · ${k.sr != null ? `n° ${k.sr} du stretch · ` : ''}n° ${k.yr} de ${k.y}${traj != null ? ` · trajet <b>${dureeFmt(traj)}</b>` : ''}</div>
       ${acts}
@@ -1804,6 +1833,7 @@ const VIEWS = {
         <div><span>Propulseur avant</span><b>${esc(powHP(nav.bt) || 'à préciser')}</b></div>
         ${nav.st || nav.stOn ? `<div><span>Propulseur arrière</span><b>${esc(nav.st ? powHP(nav.st) : 'oui')}</b></div>` : ''}
         <div><span>Puissance de recul</span><b>${esc(reculTxt(nav) || 'à préciser')}</b></div></div>
+      <div class="manv" id="resV">${resumeVitHTML(a, nav, tm, typ, ta)}</div>
       <div class="rpt"><h3>Navire — fixe</h3><div class="kv">${KV('L', fmtM(nav.longueur))}${KV('B', fmtM(nav.largeur))}${KV('Creux', fmtM(nav.hauteur))}
         ${KV('Type', nav.type)}${KV('Moteur', powHP(nav.puissance))}
         ${KV('Bittes', nav.swl != null && nav.swl !== '' ? fmtNum(firstNum(nav.swl)) + ' t' : '')}</div></div>
@@ -1855,6 +1885,7 @@ const VIEWS = {
           }
           r.querySelector('#dsqQuai').innerHTML = dsqQuaiHTML(a, dest, tm);
           r.querySelector('#degag').innerHTML = degagHTML(a, ta);
+          r.querySelector('#resV').innerHTML = resumeVitHTML(a, nav, tm, typ, ta);
         };
         r.querySelectorAll('[data-st]').forEach(inp => inp.onchange = () => {
           const v = parseNum(inp.value); a.niveaux = a.niveaux || {};
@@ -1907,7 +1938,7 @@ const VIEWS = {
   heures({id}) {
     const a = DB.get('affectations', id); if (!a) return VIEWS.notFound();
     const T = etaTable(a);
-    return {title:'Heures aux points', html:`
+    return {title:'CIP (Calling in Point)', html:`
       <div class="sub">${esc(a.navireId ? pickLabel('navires', a.navireId) : '')} · parti à <b>${esc(a.hDepart || '—')}</b>${a.hDepart ? '' : ' (entrez l\'heure de départ dans la fiche)'}</div>
       <div class="seg">${[['montant', 'Montant'], ['descendant', 'Descendant']].map(([v, l]) => `<label class="seg-opt"><input type="radio" name="hsens" value="${v}"${T.sens === v ? ' checked' : ''}><span>${l}</span></label>`).join('')}</div>
       <div class="grid2"><label class="field"><span class="lbl">Vitesse partout</span><span class="with-unit"><input id="hv" type="text" inputmode="decimal" value="${fmtNum(T.vDef)}"><span>nd</span></span></label>
