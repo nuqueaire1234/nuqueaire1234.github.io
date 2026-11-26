@@ -261,6 +261,11 @@ textarea{min-height:120px;resize:vertical;line-height:1.45}
 .manv .rv b{font-size:17px}
 .manv .rv small{display:block;color:var(--muted);font-size:13px;letter-spacing:0;text-transform:none;font-weight:400}
 .dot{display:inline-block;width:14px;height:14px;border-radius:50%;margin:0 6px 0 10px;vertical-align:-1px;box-sizing:border-box}
+.dgrow{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr) minmax(0,1fr) auto;gap:6px;align-items:center}
+.dgrow input,.dgrow select{min-width:0}
+.lirow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:center}
+.lirow .confirm{grid-column:1/-1}
+.btn small{display:block;font-size:13px;font-weight:500;opacity:.85}
 .dot.vert{background:var(--pos)}.dot.rouge{border:3px solid var(--neg)}.dot.gris{border:2px dashed var(--muted)}
 #f_meteo{min-height:120px}
 .chk{display:flex;align-items:center;gap:12px;min-height:52px;padding:0 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface);font-weight:600}
@@ -375,7 +380,7 @@ a.li{text-decoration:none;color:inherit}
 <script>
 (() => {
 'use strict';
-const VERSION = 'v0.19 · résumé vitesse et dégagements, CIP, appel APL (26 nov. 2026)';
+const VERSION = 'v0.20 · feuille en route, météo et niveaux en fenêtre (26 nov. 2026)';
 const PWA = !!window.MPP_PWA;
 
 /* ---------- Utilitaires ---------- */
@@ -426,6 +431,9 @@ const ICON = {
   eye:'<path d="M2 12s3.8-6.5 10-6.5S22 12 22 12s-3.8 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/>',
   bridge:'<path d="M2 17h20"/><path d="M3 17c2.5-7 15.5-7 18 0"/><path d="M7.5 17v-4M12 17v-5.5M16.5 17v-4"/>',
   vhf:'<path d="M8.5 7.5V2.5"/><rect x="6.5" y="7.5" width="11" height="14" rx="2.5"/><rect x="9" y="10" width="6" height="3.5" rx="1"/><path d="M9.5 16.5h5M9.5 19h5"/>',
+  trash:'<path d="M4.5 7h15M9.5 7V4.5h5V7"/><path d="M6.5 7l1 13h9l1-13"/><path d="M10.5 11v5.5M13.5 11v5.5"/>',
+  meteo:'<path d="M7 17.5h10a3.5 3.5 0 0 0 .4-7A5 5 0 0 0 7.8 9 4.3 4.3 0 0 0 7 17.5z"/>',
+  vague:'<path d="M3 9c2-1.5 4-1.5 6 0s4 1.5 6 0 4-1.5 6 0"/><path d="M3 14c2-1.5 4-1.5 6 0s4 1.5 6 0 4-1.5 6 0"/><path d="M3 19c2-1.5 4-1.5 6 0s4 1.5 6 0 4-1.5 6 0"/>',
   wheel:'<circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="1.8"/><path d="M12 2.5v7.7M12 13.8v7.7M2.5 12h7.7M13.8 12h7.7"/>'
 };
 const ic = (n, cls = '') => `<svg class="ico ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n] || ''}</svg>`;
@@ -460,8 +468,14 @@ function vitessePermise(type, largeur, dsq) {
 const STATIONS = [['TRV','Trois-Rivières'],['LSP','Lac Saint-Pierre'],['SOR','Sorel'],['CONQ','Contrecœur'],['VAR','Varennes'],['MTL','Montréal']];
 // Niveaux d'eau officiels (Service hydrographique du Canada, API SINE). Montréal = Jetée #1 (station 15520).
 const SINE = 'https://api-sine.dfo-mpo.gc.ca/api/v1/stations/';
-const SINE_ID = {TRV:'5cebf1df3d0f4a073c4bbbac', LSP:'5cebf1e03d0f4a073c4bbe49', SOR:'5cebf1e03d0f4a073c4bbe32', CONQ:'5cebf1e03d0f4a073c4bbe1b', VAR:'5cebf1e03d0f4a073c4bbe04', MTL:'5cebf1e03d0f4a073c4bbdd7'};
+const SINE_ID = {PLAV:'5dd30650e0fdc4b9b4be6e21', PJC:'5dd30650e0fdc4b9b4be6e2a', TRV:'5cebf1df3d0f4a073c4bbbac', LSP:'5cebf1e03d0f4a073c4bbe49', SOR:'5cebf1e03d0f4a073c4bbe32', CONQ:'5cebf1e03d0f4a073c4bbe1b', VAR:'5cebf1e03d0f4a073c4bbe04', MTL:'5cebf1e03d0f4a073c4bbdd7'};
 const NIV_VIEUX = 30; // minutes
+// Ponts avec prévision officielle du dégagement vertical (SHC, série dvcf-spine1). Vérifié le 26 nov. 2026 :
+// valeur SPINE = hauteur libre au centre du chenal de l'ATL 112 (p. 94) − niveau d'eau SPINE au pont.
+const PONTS = [
+  {c:'PLAV', nom:'Pont Laviolette', rem:'Centre du chenal : 49 m au-dessus de la PMSGM (ATL 112, p. 94). Aux limites du chenal : 48 m, donc 1 m de moins.'},
+  {c:'PJC', nom:'Pont Jacques-Cartier, chenal principal', rem:'Centre du chenal, sur 122 m de large : 51 m (ATL 112, p. 94).'}
+];
 const isoZ = ms => new Date(ms).toISOString().replace(/\.\d+Z$/, 'Z');
 const hLoc = ms => { const d = new Date(ms); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 async function sineSerie(code, serie, de, a) {
@@ -475,6 +489,17 @@ async function sineSerie(code, serie, de, a) {
   } finally { clearTimeout(to); }
 }
 // cible = null : dernière mesure (30 min max). Sinon : prévision SPINE la plus proche (5 min max).
+async function sinePonts(cible) {
+  const t = cible == null ? Date.now() : cible, out = {};
+  for (const p of PONTS) {
+    try {
+      const L = await sineSerie(p.c, 'dvcf-spine1', t - 360000, t + 360000);
+      const x = [...L].sort((m, n) => Math.abs(m.t - t) - Math.abs(n.t - t))[0];
+      if (x) out[p.c] = x;
+    } catch (e) {}
+  }
+  return out;
+}
 async function sineNiveaux(cible) {
   const vals = {}, ko = [], now = Date.now();
   for (const [c, nm] of STATIONS) {
@@ -550,7 +575,9 @@ const segKey = (a, b) => SEG[a + '-' + b] != null ? a + '-' + b : b + '-' + a;
 // zc = hauteur de la référence au-dessus du zéro des cartes (PMSGM à Trois-Rivières : 3,1 m). Sans zc : hauteur rapportée au zéro des cartes.
 // si = obstacle affiché sur la fiche seulement pour ce trajet. gl = sous verglas.
 const ATL = 'ATL 112 (éd. 2025-05)';
-const MARGE_MIN = 1; // Marge minimale demandée par le pilote : dégagement aérien (22 nov. 2026) et DSQ (26 nov. 2026)
+const MARGE_MIN = 1; // Marge minimale du dégagement aérien demandée par le pilote (22 nov. 2026)
+const V_RIVIERE = 7; // Rivière : le navire doit pouvoir faire plus de 7 nœuds, sinon il ne part pas (pilote, 26 nov. 2026)
+const DSQ_MANOEUVRE = 0.3; // Manœuvre au quai : DSQ de 0,30 m (pilote, 26 nov. 2026 ; P&P Port de Montréal 2.1.1)
 const DEGAG = [
   {nom:'Câble, Trois-Rivières-Ouest', hl:50, gl:37, zc:3.1, ref:'PMSGM', st:'TRV', p:94},
   {nom:'Pont Laviolette (limites du chenal)', hl:48, zc:3.1, ref:'PMSGM', rem:'49 m au centre du chenal, 225 m de large', st:'TRV', p:94},
@@ -878,19 +905,18 @@ const AFF_F = [
   {k:'n_gouvernail', label:'Gouvernail', type:'selList', list:'gouvernail', half:true},
   {sec:'Voyage — données du jour'},
   {k:'depart', label:'Départ', type:'quaiSel'},
-  {k:'sens', label:'Sens', type:'seg', opts:[['montant','Montant'],['descendant','Descendant']], half:true, wide:true},
-  {k:'vitesse', label:'Vitesse', type:'num', unit:'nd', half:true},
-  {k:'teAv', label:'Tirant d\'eau AV', type:'num', unit:'m', half:true},
-  {k:'teAr', label:'Tirant d\'eau AR', type:'num', unit:'m', half:true},
-  {k:'meteo', label:'Météo', type:'textarea', hint:'Montréal à Trois-Rivières. Rempli automatiquement, modifiable.'},
+  {k:'sens', label:'Sens', type:'seg', opts:[['montant','Montant'],['descendant','Descendant']], half:true, wide:true, seul:true},
+  {k:'vitesse', label:'Vitesse', type:'num', unit:'nd', half:true, later:true},
+  {k:'teAv', label:'Tirant d\'eau AV', type:'num', unit:'m', half:true, later:true},
+  {k:'teAr', label:'Tirant d\'eau AR', type:'num', unit:'m', half:true, seul:true},
+  {k:'meteo', label:'Météo', type:'textarea', hint:'Montréal à Trois-Rivières. Rempli automatiquement, modifiable.', later:true},
   {sec:'Destination et cargaison', later:true},
   {k:'dest', label:'Destination', type:'quaiSel', later:true},
   {k:'eta', label:'ETA à destination', type:'date', half:true, later:true},
   {k:'etaAP', label:'AM / PM', type:'seg', opts:[['AM','AM'],['PM','PM']], half:true, later:true},
   {k:'cargo', label:'Cargaison', type:'datalist', list:'cargo', half:true, later:true},
   {k:'quantite', label:'Quantité', type:'text', half:true, later:true},
-  {k:'dg', label:'Matières dangereuses', type:'text', half:true, later:true},
-  {k:'dgQte', label:'Quantité', type:'text', half:true, later:true},
+  {k:'dgs', label:'Matières dangereuses', type:'dgList', later:true},
   {k:'agent', label:'Agent', type:'text', later:true},
   {sec:'Temps', later:true},
   {k:'hDepart', label:'Parti', type:'time', later:true},
@@ -955,7 +981,11 @@ function setPow(el, v) {
 }
 const etaAPde = e => e && e.includes('T') ? (+e.slice(11, 13) < 12 ? 'AM' : 'PM') : '';
 const etaTxt = a => !a.eta ? '' : a.eta.includes('T') ? fmtDate(a.eta, true) : fmtDate(a.eta) + (a.etaAP ? ' ' + a.etaAP : '');
-const dgTxt = a => [a.dg, a.dgQte].filter(Boolean).join(' · ');
+const DG_U = ['t', 'm³', 'kg', 'L', 'barils'];
+const dgListe = a => Array.isArray(a.dgs) ? a.dgs : (a.dg || a.dgQte) ? [{p:a.dg || '', q:a.dgQte || '', u:''}] : [];
+const dgUn = x => [x.p, [x.q, x.u].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+const dgTxt = a => dgListe(a).map(dgUn).join(' ; ');
+const dgRowHTML = (x = {}) => `<div class="dgrow"><input data-dgp type="text" autocomplete="off" placeholder="Produit ou classe" aria-label="Produit ou classe" value="${esc(x.p || '')}"><input data-dgq type="text" inputmode="decimal" autocomplete="off" placeholder="Quantité" aria-label="Quantité" value="${esc(x.q || '')}"><select data-dgu aria-label="Unité">${DG_U.map(u => `<option${u === (x.u || 't') ? ' selected' : ''}>${u}</option>`).join('')}</select><button type="button" class="icon-btn sm" data-dgdel aria-label="Retirer cette ligne">${ic('close')}</button></div>`;
 // Météo marine officielle (ECCC), zone Montréal à Trois-Rivières.
 const METEO_URL = 'https://api.weather.gc.ca/collections/marineweather-realtime/items/m0000077?f=json&lang=fr';
 async function meteoMTR() {
@@ -981,6 +1011,8 @@ function fieldHTML(f, v) {
   switch (f.type) {
     case 'num':
       h = `<label class="field" for="${id}">${lbl}<span class="with-unit"><input id="${id}" name="${f.k}" type="text" inputmode="decimal" autocomplete="off" value="${v == null ? '' : esc(String(v).replace('.', ','))}"><span>${esc(f.unit)}</span></span>${hint}</label>`; break;
+    case 'dgList':
+      h = `<div class="field"><span class="lbl">${esc(f.label)}</span><div class="stack" id="${id}">${(v && v.length ? v : [{}]).map(dgRowHTML).join('')}</div><button type="button" class="btn" data-dgadd="${id}">${ic('plus', 'sm')} Ajouter une matière</button>${hint}</div>`; break;
     case 'pow': {
       const p = powParse(v), val = p.n != null ? String(p.n).replace('.', ',') : p.raw;
       h = `<div class="field"><label class="lbl" for="${id}">${esc(f.label)}</label><span class="powf"><input id="${id}" name="${f.k}" type="text" inputmode="${p.n == null && p.raw ? 'text' : 'decimal'}" autocomplete="off" value="${esc(val)}"><button type="button" class="btn" data-powu="${id}" data-u="${p.u}" aria-label="Unité : HP ou kW">${p.u || '?'}</button></span></div>`; break; }
@@ -1022,7 +1054,7 @@ function fieldHTML(f, v) {
   if (f.when) h = `<div data-when="${esc(f.when[0])}" data-wv="${esc(String(f.when[1]))}">${h}</div>`;
   return f.show ? `<div data-show="${f.show.join(' ')}">${h}</div>` : h;
 }
-function formHTML(fields, o, isEdit) {
+function formHTML(fields, o, isEdit, submit) {
   let h = '';
   for (let i = 0; i < fields.length; i++) {
     const f = fields[i], g = fields[i+1];
@@ -1032,7 +1064,7 @@ function formHTML(fields, o, isEdit) {
     else h += fieldHTML(f, o[f.k]);
   }
   return `<form id="frm" class="form" novalidate>${h}
-    <button class="btn primary block tall" type="submit">${ic('check')} Enregistrer</button>
+    <button class="btn primary block tall" type="submit">${submit || ic('check') + ' Enregistrer'}</button>
     ${isEdit ? `<div><button type="button" class="btn danger block" id="btnDel">Supprimer</button></div>` : ''}</form>`;
 }
 function readForm(form, fields) {
@@ -1046,6 +1078,7 @@ function readForm(form, fields) {
     else if (f.type === 'pick') o[f.k] = form.querySelector('#f_' + f.k).dataset.value || null;
     else if (f.type === 'num') o[f.k] = parseNum(form.querySelector('#f_' + f.k).value);
     else if (f.type === 'pow') o[f.k] = readPow(form.querySelector('#f_' + f.k));
+    else if (f.type === 'dgList') o[f.k] = [...form.querySelectorAll(`#f_${f.k} .dgrow`)].map(r => ({p:r.querySelector('[data-dgp]').value.trim(), q:r.querySelector('[data-dgq]').value.trim(), u:r.querySelector('[data-dgu]').value})).filter(x => x.p || x.q);
     else o[f.k] = form.querySelector('#f_' + f.k).value.trim();
   }
   return o;
@@ -1074,6 +1107,12 @@ function mountForm(root, fields, {onSubmit, onDelete, validate, delMsg, onPick})
     d.hidden = val !== d.dataset.wv;
   });
   form.addEventListener('change', updWhen); updWhen();
+  form.addEventListener('click', e => {
+    const ad = e.target.closest('[data-dgadd]'); if (ad) { form.querySelector('#' + ad.dataset.dgadd).insertAdjacentHTML('beforeend', dgRowHTML()); return; }
+    const dl = e.target.closest('[data-dgdel]'); if (!dl) return;
+    const row = dl.closest('.dgrow');
+    if (row.parentNode.children.length > 1) row.remove(); else row.querySelectorAll('input').forEach(i => i.value = '');
+  });
   root.querySelectorAll('[data-qs]').forEach(d => {
     const k = d.dataset.qs, au = d.querySelector(`#f_${k}Autre`), rg = d.querySelector(`#f_${k}Reg`), sel = d.querySelector(`#f_${k}Id`);
     const upd = () => { d.querySelector('[data-qsl]').hidden = au.checked; d.querySelector('[data-qst]').hidden = !au.checked; };
@@ -1159,7 +1198,7 @@ function closeSheet(viaUI) {
 /* ---------- Navigation ---------- */
 const stack = [];
 const TAB_OF = {home:'home', perso:'home', apps:'home', sites:'home', search:'home', noteEdit:'home', manEdit:'home', navires:'home', navire:'home', navireEdit:'home', compteurs:'home',
-  affectations:'affectations', aff:'affectations', affEdit:'affectations', briefing:'affectations', heures:'affectations',
+  affectations:'affectations', aff:'affectations', affEdit:'affectations', affVoy:'affectations', briefing:'affectations', heures:'affectations',
   riviere:'riviere', lieux:'riviere', lieu:'riviere', lieuEdit:'riviere', degagements:'riviere',
   reference:'reference', regles:'reference'};
 const TABS_M = [['riviere', 'ship', 'Rivière'], ['affectations', 'note', 'Fiches'], ['home', 'home', 'Accueil'], ['bottin', 'book', 'Bottin'], ['reference', 'clip', 'Référence']];
@@ -1301,7 +1340,7 @@ function openAppel(type, id) {
       + L('Contrecœur', a.hConq || etaDe(a, 'CONQ')) + L('Point 2', a.hPt2 || etaDe(a, 'CIP2'))
     : L('Navire', nav.nom, true) + L('Section de départ', depNom(a), true) + L('Destination', destNom(a), true) + L('ETA', etaTxt(a))
       + L('Cargo', [a.cargo, a.quantite].filter(Boolean).join(' · '), true) + L('TE arrière', fmtM(a.teAr))
-      + (dgTxt(a) ? L('Mat. dangereuses', dgTxt(a), true) : '');
+      + dgListe(a).map((x, i, T) => L('Mat. dangereuses' + (T.length > 1 ? ' ' + (i + 1) : ''), dgUn(x), true)).join('');
   if (type === 'tracy') {
     openSheet('Appel à Tracy', `
     <div class="readout big accent"><span class="k">Heure</span><span class="v" id="shClock">${hhmm()}</span></div>
@@ -1347,28 +1386,155 @@ function degagRows(ta, nivOf, liste = DEGAG) {
     return `<div class="verdict ${cls}"><span>${ic} ${esc(d.nom)} : marge ${fmtNum(m)} m${bad ? ' (moins de ' + MARGE_MIN + ' m)' : ''}<small>Hauteur libre ${fmtNum(d.hl)} m${refTxt}${d.gl != null ? ` (verglas ${fmtNum(d.gl)} m : marge ${fmtNum(mg)} m)` : ''}${nivTxt} · tirant d'air ${fmtNum(ta)} m${d.rem ? ' · ' + esc(d.rem) : ''} · ${ATL}, p. ${d.p}</small></span></div>`;
   }).join('');
 }
-function resumeVitHTML(a, nav, tm, typ, ta) {
+function pontsHTML(a, ta) {
+  const P = a.ponts || {};
+  return PONTS.map(p => {
+    const x = P[p.c];
+    if (!x) return `<div class="verdict unk">${esc(p.nom)} : hauteur libre non lue<small>Touchez « Niveaux en direct » ou « Prévision SPINE ».</small></div>`;
+    const m = ta != null ? r2(x.v - ta) : null, cls = m == null ? 'unk' : m < MARGE_MIN ? 'bad' : 'ok';
+    return `<div class="verdict ${cls}"><span>${m == null ? '' : m < MARGE_MIN ? '✘ ' : '✔ '}${esc(p.nom)} : hauteur libre ${fmtNum(x.v)} m à ${hLoc(x.t)}${m != null ? ` · marge ${fmtNum(m)} m${m < MARGE_MIN ? ' (moins de ' + MARGE_MIN + ' m)' : ''}` : ' · tirant d\'air inconnu'}<small>${esc(p.rem)}</small></span></div>`;
+  }).join('') + `<p class="reg">Prévision officielle SPINE du Service hydrographique du Canada (dégagement vertical), au centre du chenal, données non révisées. Tirant d'air = creux − TE arrière. Marge minimale : ${MARGE_MIN} m.<span class="src">Aide au calcul — vérifier sur la carte et dans l'ATL 112.</span></p>`;
+}
+function openNiveaux(id) {
+  const a = DB.get('affectations', id); if (!a) return;
+  const nav = DB.get('navires', a.navireId) || {}, dest = destLieu(a), tm = teMax(a), typ = isPC(nav.type) ? 'pc' : 'au', ta = tirantAir(nav, a);
+  openSheet('Niveaux d\'eau', `
+      <p class="sub">TE retenu : <b>${tm != null ? fmtM(tm) : '—'}</b> (le plus grand) · Largeur ${fmtM(nav.largeur) || '—'} · Tableau ${typ === 'pc' ? 'porte-conteneurs' : 'autres navires'}</p>
+      <button class="btn primary block" id="nivDirect">Niveaux en direct</button>
+      <div class="timef"><input id="nivH" type="text" inputmode="numeric" placeholder="hhmm" autocomplete="off" aria-label="Heure de la prévision"><button class="btn" id="nivPrev">Prévision SPINE</button></div>
+      <div id="nivInfo">${nivInfoHTML(a)}</div>
+      <div class="st-table" id="stTable">${STATIONS.map(([c, nm]) => `<div class="st-row"><span class="n">${esc(nm)}</span>
+        <input data-st="${c}" type="text" inputmode="decimal" placeholder="niv. m" aria-label="Niveau d'eau ${esc(nm)}" value="${a.niveaux && a.niveaux[c] != null ? esc(String(a.niveaux[c]).replace('.', ',')) : ''}">
+        <span class="r" id="res_${c}"></span></div>`).join('')}</div>
+      <div id="dsqQuai"></div>
+      <p class="reg">Chenal : ${fmtNum(CHENAL)} m jusqu'à M177. DSQ = chenal + niveau − TE. Vitesse permise : ligne de largeur supérieure, sans interpolation. Tableaux DSQ 2013 (Avis 27C), à vérifier contre l'officiel.<span class="src">Aide au calcul — le pilote décide, les SCTM/VTS ont priorité.</span></p>
+      <h2 class="sec">Hauteur libre officielle sous les ponts</h2>
+      <div class="stack" id="ponts">${pontsHTML(a, ta)}</div>
+      <h2 class="sec">Dégagements aériens (calcul ATL 112)</h2>
+      <div id="degag">${degagHTML(a, ta)}</div>
+      <button class="btn block" id="nvClose">Fermer</button>`, r => {
+    const save = () => DB.put('affectations', a);
+    const onChange = () => { const e = $('#resV'); if (e) e.innerHTML = resumeVoyHTML(a, nav, tm, typ, ta, dest); };
+    r.querySelector('#nvClose').onclick = () => closeSheet(true);
+        const recalc = () => {
+          if (!r.querySelector('#stTable')) { onChange(); return; } // fenêtre fermée pendant la lecture
+          for (const [c] of STATIONS) {
+            const nv = a.niveaux ? a.niveaux[c] : null, out = r.querySelector('#res_' + c);
+            if (nv == null || tm == null) { out.innerHTML = tm == null ? 'TE ?' : ''; continue; }
+            const dsq = r2(CHENAL + nv - tm), vp = vitessePermise(typ, nav.largeur, dsq); // arrondi au cm, comme le résumé
+            out.innerHTML = `DSQ <b>${fmtNum(dsq)}</b> m<br>${vp.v != null ? `<span class="ok-t">≤ ${vp.v} nœuds</span>` : `<span class="warn-t">${esc(vp.msg)}</span>`}`;
+          }
+          r.querySelector('#dsqQuai').innerHTML = dsqQuaiHTML(a, dest, tm);
+          r.querySelector('#degag').innerHTML = degagHTML(a, ta);
+          r.querySelector('#ponts').innerHTML = pontsHTML(a, ta);
+          if (onChange) onChange();
+        };
+        r.querySelectorAll('[data-st]').forEach(inp => inp.onchange = () => {
+          const v = parseNum(inp.value); a.niveaux = a.niveaux || {};
+          if (v == null) delete a.niveaux[inp.dataset.st]; else if (Number.isNaN(v)) { toast('Niveau invalide (ex. 0,35 ou -0,20)'); return; } else a.niveaux[inp.dataset.st] = v;
+          a.niveauxH = nowLocal(); if (a.niveauxSrc) a.niveauxSrc.manuel = true; save(); recalc(); r.querySelector('#nivInfo').innerHTML = nivInfoHTML(a);
+        });
+        recalc();
+        const bD = r.querySelector('#nivDirect'), bP = r.querySelector('#nivPrev');
+        const lire = async (cible, b) => {
+          const txt = b.textContent; bD.disabled = bP.disabled = true; b.textContent = 'Lecture…';
+          const {vals, ko} = await sineNiveaux(cible);
+          bD.disabled = bP.disabled = false; b.textContent = txt;
+          const cles = Object.keys(vals);
+          if (!cles.length) { toast('Niveaux indisponibles : entrez-les à la main.'); return; }
+          a.niveaux = a.niveaux || {};
+          cles.forEach(c => { a.niveaux[c] = vals[c].v; const i = r.querySelector(`[data-st="${c}"]`); if (i) i.value = String(vals[c].v).replace('.', ','); });
+          const pv = await sinePonts(cible); if (Object.keys(pv).length) a.ponts = pv;
+          a.niveauxH = nowLocal();
+          a.niveauxSrc = {type:cible == null ? 'mesure' : 'spine', t:Math.min(...cles.map(c => vals[c].t)), cible, lu:Date.now(), ko};
+          save(); recalc(); if (r.isConnected) r.querySelector('#nivInfo').innerHTML = nivInfoHTML(a);
+          toast((ko.length ? `${cles.length} stations lues sur ${STATIONS.length}` : 'Niveaux à jour') + (Object.keys(pv).length < PONTS.length ? ' · ponts non lus' : ''));
+        };
+        bD.onclick = () => lire(null, bD);
+        bP.onclick = () => {
+          const h = parseTime(r.querySelector('#nivH').value);
+          if (!h) { toast('Entrez l\'heure de passage (ex. 1630)'); r.querySelector('#nivH').focus(); return; }
+          r.querySelector('#nivH').value = h;
+          const d = new Date(); d.setHours(+h.slice(0, 2), +h.slice(3), 0, 0);
+          if (d.getTime() < Date.now() - 1800000) d.setDate(d.getDate() + 1); // heure passée = demain
+          lire(d.getTime(), bP);
+        };
+  });
+}
+function openMeteo(id) {
+  const a = DB.get('affectations', id);
+  const aff = t => `<div class="info" id="mtTxt">${esc(t).replace(/\n/g, '<br>')}</div>`;
+  openSheet('Météo', `<div id="mtBox">${aff(a && a.meteo ? a.meteo : 'Lecture de la météo…')}</div>
+    <button class="btn primary block" id="mtMaj">Actualiser la météo</button>
+    <button class="btn block" id="mtClose">Fermer</button>`, sh => {
+    sh.querySelector('#mtClose').onclick = () => closeSheet(true);
+    const lire = force => meteoMTR().then(t => {
+      if (a) { a.meteo = t; DB.put('affectations', a); }
+      const b = sh.querySelector('#mtBox'); if (b) b.innerHTML = aff(t);
+      if (force) toast('Météo à jour');
+    }).catch(() => toast('Météo indisponible' + (a && a.meteo ? ' : dernière météo affichée.' : '.')));
+    sh.querySelector('#mtMaj').onclick = () => lire(true);
+    lire(false);
+  });
+}
+function openTemps0(id) {
+  const a = DB.get('affectations', id); if (!a) return;
+  const c = etaTable(a).rows[0].c, nom = temps0Nom(c), cur = (a.passages || {})[c] || '';
+  openSheet('Temps à ' + nom, `
+    <p class="sub">Les heures aux autres CIP se calculent à partir de cette heure.</p>
+    <div class="timef"><input id="t0" type="text" inputmode="numeric" placeholder="hhmm" autocomplete="off" value="${esc(cur)}" aria-label="Heure à ${esc(nom)}"><button class="btn" id="t0Now">Maintenant</button></div>
+    <button class="btn primary block tall" id="t0Ok">Enregistrer</button>
+    ${cur ? '<button class="btn block" id="t0Del">Effacer l\'heure</button>' : ''}
+    <button class="btn block" id="t0Close">Fermer</button>`, sh => {
+    const fin = msg => { DB.put('affectations', a); closeSheet(true); toast(msg); setTimeout(() => go('aff', {id}, {replace:true}), 80); };
+    sh.querySelector('#t0Now').onclick = () => { sh.querySelector('#t0').value = hhmm(); };
+    sh.querySelector('#t0Ok').onclick = () => {
+      const h = parseTime(sh.querySelector('#t0').value);
+      if (!h) { toast('Heure invalide (ex. 1630)'); sh.querySelector('#t0').focus(); return; }
+      a.passages = {...(a.passages || {}), [c]:h}; fin(`${nom} : ${h}`);
+    };
+    const d = sh.querySelector('#t0Del'); if (d) d.onclick = () => { delete a.passages[c]; fin('Heure effacée'); };
+    sh.querySelector('#t0Close').onclick = () => closeSheet(true);
+  });
+}
+const temps0Nom = c => c === 'PDO' ? 'Pointe-des-Ormes' : c === '110' ? 'la 110' : ptName(c);
+function resumeVoyHTML(a, nav, tm, typ, ta, dest) {
   const up = (a.sens || guessSens(a)) === 'montant', vPrev = a.vitesse || (up ? 10 : 14);
   const D = c => `<i class="dot ${c}"></i>`;
+  let tousOk = true, manque = false;
   const lignes = STATIONS.map(([c, nm]) => {
     const nv = a.niveaux ? a.niveaux[c] : null;
-    if (nv == null || tm == null) return `<div class="rv"><span>${esc(nm)}</span><b>${D('gris')}${tm == null ? 'TE ?' : 'niveau ?'}</b></div>`;
+    if (nv == null || tm == null) { manque = true; return `<div class="rv"><span>${esc(nm)}</span><b>${tm == null ? 'TE ?' : 'niveau ?'}${D('gris')}</b></div>`; }
     const dsq = r2(CHENAL + nv - tm), vp = vitessePermise(typ, nav.largeur, dsq);
     const vTxt = vp.v != null ? vp.v + ' nd' : nav.largeur == null ? 'largeur ?' : nav.largeur > 44 ? 'hors tableau' : 'moins de 7 nd';
-    return `<div class="rv"><span>${esc(nm)}</span><b>DSQ ${fmtNum(dsq)} m${D(dsq >= MARGE_MIN ? 'vert' : 'rouge')}${vTxt}${D(vp.v != null && vp.v >= vPrev ? 'vert' : 'rouge')}</b></div>`;
+    if (vp.v == null || vp.v < vPrev) tousOk = false;
+    return `<div class="rv"><span>${esc(nm)}</span><b>DSQ ${fmtNum(dsq)} m · ${vTxt}${D(vp.v != null && vp.v > V_RIVIERE ? 'vert' : nav.largeur == null ? 'gris' : 'rouge')}</b></div>`;
   });
+  // DSQ pour la manœuvre au quai de destination
+  let man;
+  if (!dest || dest.cat !== 'quai') man = `<b>destination ?${D('gris')}</b>`;
+  else if (dest.profondeur == null) man = `<b>profondeur à préciser${D('gris')}<small>${esc(dest.nom)}</small></b>`;
+  else {
+    const sc = stCode(dest.station), nv = sc && a.niveaux ? a.niveaux[sc] : null;
+    if (!sc || nv == null || tm == null) man = `<b>${!sc ? 'station ?' : tm == null ? 'TE ?' : 'niveau ?'}${D('gris')}<small>${esc(dest.nom)}</small></b>`;
+    else {
+      const regl = isMtlQuai(dest) && firstNum(dest.nom) >= 22 && firstNum(dest.nom) <= 32 ? 0.91 : 0, req = Math.max(DSQ_MANOEUVRE, regl), dsq = r2(dest.profondeur + nv - tm);
+      man = `<b>${fmtNum(dsq)} m${D(dsq >= req ? 'vert' : 'rouge')}<small>${esc(dest.nom)} · minimum ${fmtNum(req)} m</small></b>`;
+    }
+  }
   let air;
-  if (ta == null) air = `<b>${D('gris')}tirant d'air ?</b>`;
+  if (ta == null) air = `<b>tirant d'air ?${D('gris')}</b>`;
   else {
     const L = degagDe(a).map(d => { const nv = a.niveaux ? a.niveaux[d.st] : null; return {nom:d.nom, has:nv != null, m:r2(d.hl + (nv != null ? (d.zc || 0) - nv : 0) - ta)}; });
     const pire = [...L].sort((x, y) => x.m - y.m)[0], bad = L.some(x => x.m < MARGE_MIN), inc = L.some(x => !x.has);
     air = pire ? `<b>${fmtNum(pire.m)} m${D(bad ? 'rouge' : inc ? 'gris' : 'vert')}<small>${esc(pire.nom)}${inc && !bad ? ' · niveau manquant' : ''}</small></b>` : `<b>aucun obstacle</b>`;
   }
-  return `<h3>Résumé vitesse et dégagements</h3>
-    <div class="rv"><span>Vitesse prévue</span><b>${fmtNum(vPrev)} nd · ${up ? 'montant' : 'descendant'}</b></div>
+  return `<h3>Résumé de voyage</h3>
+    <div class="rv"><span>Vitesse prévue</span><b>${fmtNum(vPrev)} nd · ${up ? 'montant' : 'descendant'}${D(manque ? 'gris' : tousOk ? 'vert' : 'rouge')}</b></div>
     ${lignes.join('')}
+    <div class="rv"><span>DSQ pour la manœuvre</span>${man}</div>
     <div class="rv"><span>Dégagement aérien le plus serré</span>${air}</div>
-    <p class="sub" style="margin:0">Rond vert : DSQ et air d'au moins ${MARGE_MIN} m, vitesse permise au moins égale à la vitesse prévue (vitesse sur l'eau). Anneau rouge : à vérifier. Pointillé : donnée manquante.</p>`;
+    <p class="sub" style="margin:0">Rond vert : vitesse permise de plus de ${V_RIVIERE} nœuds dans la rivière (sinon le navire ne part pas) · vitesse prévue permise partout · DSQ d'au moins ${fmtNum(DSQ_MANOEUVRE)} m pour la manœuvre · air d'au moins ${MARGE_MIN} m. Anneau rouge : à vérifier. Pointillé : donnée manquante. Les niveaux se lisent avec le bouton « Niveaux d'eau ».</p>`;
 }
 const DEGAG_NOTE = `<p class="reg">Tirant d'air = creux (quille → mât) − tirant d'eau arrière. Marge minimale demandée : ${MARGE_MIN} m. Sans niveau d'eau, le résultat reste « à confirmer ». Trois-Rivières-Ouest et Laviolette sont mesurés depuis la PMSGM, à 3,1 m au-dessus du zéro des cartes (${ATL}, p. 94).<span class="src">Aide au calcul — vérifier sur la carte et dans l'ATL 112.</span></p>`;
 function degagHTML(a, ta) {
@@ -1728,10 +1894,10 @@ const VIEWS = {
       <div class="toolbar"><input id="q" type="search" value="${esc(q)}" placeholder="Nom du navire" aria-label="Filtrer par navire" autocomplete="off">
         <select id="tri" aria-label="Trier" style="width:auto">${[['date', 'Plus récentes'], ['ancien', 'Plus anciennes'], ['nom', 'Nom du navire'], ['depart', 'Lieu de départ'], ['dest', 'Destination']].map(([v, l]) => `<option value="${v}"${v === tri ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
       <p class="sub" id="nb">${pl(list.length, 'fiche', 'fiches')}</p>
-      <div class="stack" id="lst">${list.length ? list.map(affLi).join('') : '<p class="empty">Aucune fiche pour cette période.</p>'}</div>`,
+      <div class="stack" id="lst">${list.length ? list.map(x => affLi(x, true)).join('') : '<p class="empty">Aucune fiche pour cette période.</p>'}</div>`,
       mount: r => {
         const f = () => { const Q = norm(r.querySelector('#q').value); stack[stack.length - 1].params = {an, tri, q:r.querySelector('#q').value};
-          r.querySelectorAll('#lst .li').forEach(b => b.hidden = !b.dataset.name.includes(Q)); };
+          r.querySelectorAll('#lst .li').forEach(b => (b.closest('.lirow') || b).hidden = !b.dataset.name.includes(Q)); };
         r.querySelector('#q').oninput = f; f();
         r.querySelector('#tri').onchange = e => go('affectations', {an, tri:e.target.value, q:r.querySelector('#q').value}, {replace:true});
       }};
@@ -1743,8 +1909,10 @@ const VIEWS = {
     const vals = {...a, depart:{autre:a.departAutre, id:a.departId, txt:a.departTxt}, dest:{autre:a.destAutre || a.destMode === 'mer', id:a.destId, txt:a.destTxt}};
     NAV_KEYS.forEach(k => vals['n_' + k] = nav[k]);
     if (a.eta && a.eta.includes('T')) { vals.eta = a.eta.slice(0, 10); vals.etaAP = a.etaAP || etaAPde(a.eta); }
-    const prep = !id || a.statut === 'prep', CHAMPS = prep ? AFF_F.filter(f => !f.later) : AFF_F;
-    return {title:id ? 'Modifier la fiche' : 'Nouvelle affectation', action:saveAction, html:formHTML(CHAMPS, vals, !!id),
+    vals.dgs = dgListe(a);
+    const prep = !id || a.statut === 'prep', CHAMPS = prep ? AFF_F.filter(f => !f.later).map(f => f.seul ? {...f, half:false} : f) : AFF_F;
+    return {title:id ? 'Modifier la fiche' : 'Nouvelle affectation', action:prep ? {label:'Démarrer', fn:saveAction.fn} : saveAction,
+      html:formHTML(CHAMPS, vals, !!id, prep ? '▶ Démarrer l\'affectation' : ''),
       mount: r => {
         mountForm(r, CHAMPS, {
           delMsg:'Supprimer cette fiche ? Les compteurs seront recalculés.',
@@ -1756,7 +1924,7 @@ const VIEWS = {
               const val = n[key] == null ? '' : String(n[key]).replace('.', ',');
               if (el.tagName === 'SELECT' && val && ![...el.options].some(o => o.value === val)) el.add(new Option(val, val));
               el.value = val; });
-            if (n.dernierTeAv != null && !form.querySelector('#f_teAv').value) form.querySelector('#f_teAv').value = String(n.dernierTeAv).replace('.', ',');
+            if (n.dernierTeAv != null && form.querySelector('#f_teAv') && !form.querySelector('#f_teAv').value) form.querySelector('#f_teAv').value = String(n.dernierTeAv).replace('.', ',');
             if (n.dernierTeAr != null && !form.querySelector('#f_teAr').value) form.querySelector('#f_teAr').value = String(n.dernierTeAr).replace('.', ',');
             form.dispatchEvent(new Event('change')); setFixe(!hasFixe(n));
             const nb = itemsFor({navireId:pid}).length, u = usage('navire', pid);
@@ -1768,9 +1936,11 @@ const VIEWS = {
             const n = DB.get('navires', o.navireId);
             if (n) DB.put('navires', {...n, ...navUpd, ...(o.teAv != null ? {dernierTeAv:o.teAv} : {}), ...(o.teAr != null ? {dernierTeAr:o.teAr} : {})});
             if (o.cargo && !liste('cargo').some(c => norm(c) === norm(o.cargo))) { DB.d.reglages.listes.cargo.push(o.cargo); }
+            if ('dgs' in o) { o.dg = null; o.dgQte = null; }
+            if (prep) { o.statut = 'route'; if (!o.sens) o.sens = guessSens({...a, ...o}); }
             const s = DB.put('affectations', {...a, ...o, destMode:null});
             const k = ranks(s);
-            toast(`${id ? 'Fiche enregistrée' : 'Affectation préparée'} · ${k.sr != null ? `n° ${k.sr} du stretch · ` : ''}n° ${k.yr} de ${k.y}`);
+            toast(`${prep ? 'Affectation démarrée' : 'Fiche enregistrée'} · ${k.sr != null ? `n° ${k.sr} du stretch · ` : ''}n° ${k.yr} de ${k.y}`);
             go('aff', {id:s.id}, {replace:true});
           },
           onDelete: () => { DB.del('affectations', id); toast('Fiche supprimée'); dropFromStack(id); }
@@ -1784,11 +1954,12 @@ const VIEWS = {
         setFixe(!hasFixe(nav));
         const vEl = r.querySelector('#f_vitesse'), VD = {montant:10, descendant:14};
         const sensOn = r.querySelector('input[name="sens"]:checked');
-        if (sensOn && !vEl.value) vEl.value = VD[sensOn.value];
-        r.querySelectorAll('input[name="sens"]').forEach(i => i.addEventListener('change', () => {
+        if (vEl && sensOn && !vEl.value) vEl.value = VD[sensOn.value];
+        if (vEl) r.querySelectorAll('input[name="sens"]').forEach(i => i.addEventListener('change', () => {
           const cur = parseNum(vEl.value); if (cur == null || Object.values(VD).includes(cur)) vEl.value = VD[i.value];
         }));
-        const mEl = r.querySelector('#f_meteo'), mBtn = document.createElement('button');
+        const mEl = r.querySelector('#f_meteo'); if (!mEl) return;
+        const mBtn = document.createElement('button');
         mBtn.type = 'button'; mBtn.className = 'btn block'; mBtn.textContent = 'Actualiser la météo';
         mEl.closest('.field').after(mBtn);
         const chargeMeteo = force => meteoMTR().then(t => {
@@ -1798,6 +1969,29 @@ const VIEWS = {
         mBtn.onclick = () => chargeMeteo(true);
         if (prep && !mEl.value.trim()) chargeMeteo(false);
       }};
+  },
+  affVoy({id}) {
+    const a = DB.get('affectations', id); if (!a) return VIEWS.notFound();
+    const F = [
+      {k:'teAv', label:'Tirant d\'eau AV', type:'num', unit:'m', half:true},
+      {k:'teAr', label:'Tirant d\'eau AR', type:'num', unit:'m', half:true},
+      {k:'cargo', label:'Cargaison', type:'datalist', list:'cargo', half:true},
+      {k:'quantite', label:'Quantité', type:'text', half:true},
+      {k:'eta', label:'ETA à destination', type:'date', half:true},
+      {k:'etaAP', label:'AM / PM', type:'seg', opts:[['AM','AM'],['PM','PM']], half:true},
+      {k:'dest', label:'Destination', type:'quaiSel'},
+      {k:'dgs', label:'Matières dangereuses', type:'dgList', hint:'Une ligne par produit ou par classe. Elles sont lues dans l\'appel de départ.'}
+    ];
+    const vals = {...a, dest:{autre:a.destAutre || a.destMode === 'mer', id:a.destId, txt:a.destTxt}, dgs:dgListe(a)};
+    if (a.eta && a.eta.includes('T')) { vals.eta = a.eta.slice(0, 10); vals.etaAP = a.etaAP || etaAPde(a.eta); }
+    return {title:'Données du navire', action:saveAction, html:formHTML(F, vals, false), mount: r => mountForm(r, F, {
+      onSubmit: o => {
+        if (a.eta && a.eta.includes('T') && o.eta === a.eta.slice(0, 10) && o.etaAP === (a.etaAP || etaAPde(a.eta))) o.eta = a.eta;
+        if (o.cargo && !liste('cargo').some(c => norm(c) === norm(o.cargo))) DB.d.reglages.listes.cargo.push(o.cargo);
+        const n = DB.get('navires', a.navireId);
+        if (n) DB.put('navires', {...n, ...(o.teAv != null ? {dernierTeAv:o.teAv} : {}), ...(o.teAr != null ? {dernierTeAr:o.teAr} : {})});
+        DB.put('affectations', {...a, ...o, dg:null, dgQte:null, destMode:null}); toast('Données enregistrées'); back();
+      }})};
   },
   aff({id}) {
     const a = DB.get('affectations', id); if (!a) return VIEWS.notFound();
@@ -1813,17 +2007,21 @@ const VIEWS = {
     const KT = (kk, v) => v ? `<span class="wrap"><i>${esc(kk)}</i>${esc(v)}</span>` : '';
     const pas = a.passages || {}, pasTxt = Object.keys(pas).map(c => KV(c, pas[c])).join('');
     const ST = {prep:'En préparation', route:'En route', fini:'Terminée'};
+    const t0c = etaTable(a).rows[0].c, t0nom = temps0Nom(t0c), t0h = (a.passages || {})[t0c];
     const acts = st === 'prep'
       ? `<button class="btn primary block tall" data-start="${id}">▶ Démarrer l'affectation</button>`
       : st === 'route'
-        ? `<div class="row"><button class="btn primary tall" data-appel="depart" data-id="${id}">${ic('vhf')} Appel de départ</button><button class="btn tall" data-go="heures" data-id="${id}">⏱ CIP</button></div>
+        ? `<div class="row"><button class="btn tall" data-go="affVoy" data-id="${id}">${ic('ship')} Données du navire</button><button class="btn primary tall" data-appel="depart" data-id="${id}">${ic('vhf')} Appel de départ</button></div>
+          <div class="row"><button class="btn tall" data-go="heures" data-id="${id}">⏱ CIP</button><button class="btn tall" data-t0="${id}"><span>⏱ Temps à ${esc(t0nom)}<small>${esc(t0h || 'à entrer')}</small></span></button></div>
           ${versLambert(a) ? `<button class="btn block" data-appel="tracy" data-id="${id}">${ic('vhf')} Appel à Tracy (Voie maritime)</button>` : ''}
-          ${TELS.lpa ? `<a class="btn block tall" href="${esc(telHref(TELS.lpa))}">${ic('phone')} Appeler l'APL (dispatch)</a>` : `<button class="btn block tall" data-notel="1">${ic('phone')} Appeler l'APL (dispatch)</button>`}
+          ${TELS.lpa ? `<a class="btn block tall" href="${esc(telHref(TELS.lpa))}">${ic('phone')} Appeler l'APL</a>` : `<button class="btn block tall" data-notel="1">${ic('phone')} Appeler l'APL</button>`}
           <div class="row">${navetteBtn(dest)}<button class="btn" data-finish="${id}">⚓ Débarqué</button></div>`
         : `<div class="row"><button class="btn" data-go="heures" data-id="${id}">⏱ CIP</button><button class="btn" data-appel="depart" data-id="${id}">${ic('vhf')} Résumé</button></div>`;
+
     return {title:nav.nom || 'Fiche navire', action:{label:'Modifier', icon:'edit', fn:() => go('affEdit', {id})}, html:`
       <div class="sub"><b>${ST[st]}</b> · ${k.sr != null ? `n° ${k.sr} du stretch · ` : ''}n° ${k.yr} de ${k.y}${traj != null ? ` · trajet <b>${dureeFmt(traj)}</b>` : ''}</div>
       ${acts}
+      <div class="row"><button class="btn" data-meteo="${id}">${ic('meteo')} Météo</button><button class="btn" data-niv="${id}">${ic('vague')} Niveaux d'eau</button></div>
       <button class="btn block" data-go="briefing" data-aff-id="${id}">${ic('eye')} Notes de manœuvre${al ? ` · ${al} alerte${al > 1 ? 's' : ''}` : ''}</button>
       ${reglesFiche(a, nav, dest).map(regHTML).join('')}
       ${ancVerdictHTML(dest, a, nav)}
@@ -1833,30 +2031,17 @@ const VIEWS = {
         <div><span>Propulseur avant</span><b>${esc(powHP(nav.bt) || 'à préciser')}</b></div>
         ${nav.st || nav.stOn ? `<div><span>Propulseur arrière</span><b>${esc(nav.st ? powHP(nav.st) : 'oui')}</b></div>` : ''}
         <div><span>Puissance de recul</span><b>${esc(reculTxt(nav) || 'à préciser')}</b></div></div>
-      <div class="manv" id="resV">${resumeVitHTML(a, nav, tm, typ, ta)}</div>
+      <div class="manv" id="resV">${resumeVoyHTML(a, nav, tm, typ, ta, dest)}</div>
       <div class="rpt"><h3>Navire — fixe</h3><div class="kv">${KV('L', fmtM(nav.longueur))}${KV('B', fmtM(nav.largeur))}${KV('Creux', fmtM(nav.hauteur))}
         ${KV('Type', nav.type)}${KV('Moteur', powHP(nav.puissance))}
         ${KV('Bittes', nav.swl != null && nav.swl !== '' ? fmtNum(firstNum(nav.swl)) + ' t' : '')}</div></div>
       <div class="rpt"><h3>Voyage</h3><div class="kv">${KT('De', depNom(a))}${KT('Vers', destNom(a))}${KV('ETA', etaTxt(a))}
         ${KT('Cargo', [a.cargo, a.quantite].filter(Boolean).join(' · '))}${KT('DG', dgTxt(a))}${KV('TE AV', fmtM(a.teAv))}${KV('TE AR', fmtM(a.teAr))}${KV('T. d\'air', fmtM(ta))}
         ${KT('Agent', a.agent)}</div></div>
-      ${a.meteo ? `<div class="info"><b>Météo</b><br>${esc(a.meteo).replace(/\n/g, '<br>')}</div>` : ''}
       <div class="rpt"><h3>Temps</h3><div class="kv">${KV('Affecté', fmtDate(a.date, true))}${KV('Parti', a.hDepart)}${KV('Débarqué', a.hDebarque)}${KV('Trajet', traj != null ? dureeFmt(traj) : '')}
         ${KV('Tugs', a.hTugs)}${KV('Linesmen', a.hLines)}${a.releve ? KV('Relève', a.hReleve || 'oui') : ''}${pasTxt}</div></div>
       <h2 class="sec">Remorqueurs et bittes</h2>
       ${tugs.length ? tugs.map(([pos, tid]) => tugHTML(pos, DB.get('lieux', tid), nav)).join('') : '<p class="empty">Aucun remorqueur choisi.</p>'}
-      <h2 class="sec">Niveaux d'eau, DSQ et vitesse permise</h2>
-      <p class="sub">TE retenu : <b>${tm != null ? fmtM(tm) : '—'}</b> (le plus grand) · Largeur ${fmtM(nav.largeur) || '—'} · Tableau ${typ === 'pc' ? 'porte-conteneurs' : 'autres navires'}</p>
-      <button class="btn primary block" id="nivDirect">Niveaux en direct</button>
-      <div class="timef"><input id="nivH" type="text" inputmode="numeric" placeholder="hhmm" autocomplete="off" aria-label="Heure de la prévision"><button class="btn" id="nivPrev">Prévision SPINE</button></div>
-      <div id="nivInfo">${nivInfoHTML(a)}</div>
-      <div class="st-table" id="stTable">${STATIONS.map(([c, nm]) => `<div class="st-row"><span class="n">${esc(nm)}</span>
-        <input data-st="${c}" type="text" inputmode="decimal" placeholder="niv. m" aria-label="Niveau d'eau ${esc(nm)}" value="${a.niveaux && a.niveaux[c] != null ? esc(String(a.niveaux[c]).replace('.', ',')) : ''}">
-        <span class="r" id="res_${c}"></span></div>`).join('')}</div>
-      <div id="dsqQuai"></div>
-      <p class="reg">Chenal : ${fmtNum(CHENAL)} m jusqu'à M177. DSQ = chenal + niveau − TE. Vitesse permise : ligne de largeur supérieure, sans interpolation. Tableaux DSQ 2013 (Avis 27C), à vérifier contre l'officiel.<span class="src">Aide au calcul — le pilote décide, les SCTM/VTS ont priorité.</span></p>
-      <h2 class="sec">Dégagements aériens</h2>
-      <div id="degag">${degagHTML(a, ta)}</div>
       <h2 class="sec">Rencontre (post-Panamax)</h2>
       <div class="stack">${(a.rencontres || []).map(rc => rencHTML(rc, nav)).join('') || '<p class="empty">Aucune rencontre notée.</p>'}</div>
       <details><summary class="btn block">${ic('plus', 'sm')} Ajouter une rencontre</summary>
@@ -1876,46 +2061,6 @@ const VIEWS = {
       <div class="stack">${itemsBlock(mans, {hideNavire:true}, 'Après la manœuvre, notez ici ce qui a bien ou moins bien marché.')}</div>`,
       mount: r => {
         const save = () => DB.put('affectations', a);
-        const recalc = () => {
-          for (const [c] of STATIONS) {
-            const nv = a.niveaux ? a.niveaux[c] : null, out = r.querySelector('#res_' + c);
-            if (nv == null || tm == null) { out.innerHTML = tm == null ? 'TE ?' : ''; continue; }
-            const dsq = CHENAL + nv - tm, vp = vitessePermise(typ, nav.largeur, dsq);
-            out.innerHTML = `DSQ <b>${fmtNum(Math.round(dsq * 100) / 100)}</b> m<br>${vp.v != null ? `<span class="ok-t">≤ ${vp.v} nœuds</span>` : `<span class="warn-t">${esc(vp.msg)}</span>`}`;
-          }
-          r.querySelector('#dsqQuai').innerHTML = dsqQuaiHTML(a, dest, tm);
-          r.querySelector('#degag').innerHTML = degagHTML(a, ta);
-          r.querySelector('#resV').innerHTML = resumeVitHTML(a, nav, tm, typ, ta);
-        };
-        r.querySelectorAll('[data-st]').forEach(inp => inp.onchange = () => {
-          const v = parseNum(inp.value); a.niveaux = a.niveaux || {};
-          if (v == null) delete a.niveaux[inp.dataset.st]; else if (Number.isNaN(v)) { toast('Niveau invalide (ex. 0,35 ou -0,20)'); return; } else a.niveaux[inp.dataset.st] = v;
-          a.niveauxH = nowLocal(); if (a.niveauxSrc) a.niveauxSrc.manuel = true; save(); recalc(); r.querySelector('#nivInfo').innerHTML = nivInfoHTML(a);
-        });
-        recalc();
-        const bD = r.querySelector('#nivDirect'), bP = r.querySelector('#nivPrev');
-        const lire = async (cible, b) => {
-          const txt = b.textContent; bD.disabled = bP.disabled = true; b.textContent = 'Lecture…';
-          const {vals, ko} = await sineNiveaux(cible);
-          bD.disabled = bP.disabled = false; b.textContent = txt;
-          const cles = Object.keys(vals);
-          if (!cles.length) { toast('Niveaux indisponibles : entrez-les à la main.'); return; }
-          a.niveaux = a.niveaux || {};
-          cles.forEach(c => { a.niveaux[c] = vals[c].v; const i = r.querySelector(`[data-st="${c}"]`); if (i) i.value = String(vals[c].v).replace('.', ','); });
-          a.niveauxH = nowLocal();
-          a.niveauxSrc = {type:cible == null ? 'mesure' : 'spine', t:Math.min(...cles.map(c => vals[c].t)), cible, lu:Date.now(), ko};
-          save(); recalc(); if (r.isConnected) r.querySelector('#nivInfo').innerHTML = nivInfoHTML(a);
-          toast(ko.length ? `${cles.length} stations lues sur ${STATIONS.length}` : 'Niveaux à jour');
-        };
-        bD.onclick = () => lire(null, bD);
-        bP.onclick = () => {
-          const h = parseTime(r.querySelector('#nivH').value);
-          if (!h) { toast('Entrez l\'heure de passage (ex. 1630)'); r.querySelector('#nivH').focus(); return; }
-          r.querySelector('#nivH').value = h;
-          const d = new Date(); d.setHours(+h.slice(0, 2), +h.slice(3), 0, 0);
-          if (d.getTime() < Date.now() - 1800000) d.setDate(d.getDate() + 1); // heure passée = demain
-          lire(d.getTime(), bP);
-        };
         r.querySelector('#evAdd').onclick = () => {
           const h = parseTime(r.querySelector('#evH').value), t = r.querySelector('#evT').value.trim();
           if (h === null || !h) { toast('Heure invalide (ex. 0630)'); return; } if (!t) { toast('Écrivez l\'événement'); return; }
@@ -2157,11 +2302,12 @@ const VIEWS = {
       }};
   }
 };
-function affLi(a) {
+function affLi(a, del) {
   const k = ranks(a), t = tempsTrajet(a), nm = a.navireId ? pickLabel('navires', a.navireId) : 'Navire ?';
   const badge = a.statut === 'route' ? ' · <b class="ok-t">EN ROUTE</b>' : a.statut === 'prep' ? ' · <b class="warn-t">EN PRÉPARATION</b>' : '';
-  return `<button class="li" data-go="aff" data-id="${a.id}" data-name="${esc(norm(nm))}">${ic('clip')}<span class="li-main"><span class="t">${esc(nm)}</span><span class="s">${fmtDate(a.date, true)} · ${esc(depNom(a) || '?')} → ${esc(destNom(a) || '?')}${t != null ? ' · trajet ' + dureeFmt(t) : ''}${badge}</span></span>
+  const li = `<button class="li" data-go="aff" data-id="${a.id}" data-name="${esc(norm(nm))}">${ic('clip')}<span class="li-main"><span class="t">${esc(nm)}</span><span class="s">${fmtDate(a.date, true)} · ${esc(depNom(a) || '?')} → ${esc(destNom(a) || '?')}${t != null ? ' · trajet ' + dureeFmt(t) : ''}${badge}</span></span>
     <span class="li-side"><span class="n">${k.sr != null ? 'S' + k.sr + ' · ' : ''}A${k.yr}</span></span></button>`;
+  return del ? `<div class="lirow">${li}<button class="icon-btn sm" data-affdel="${a.id}" aria-label="Supprimer la fiche">${ic('trash')}</button></div>` : li;
 }
 function hydrate() {
   const pv = DB.d.prive; if (INJECTE || !pv) return;
@@ -2202,6 +2348,17 @@ $('#main').addEventListener('click', e => {
   if (e.target.closest('[data-notel]')) { toast('Numéro absent : restaurez votre sauvegarde dans Réglages.'); return; }
   const sa = e.target.closest('[data-start]'); if (sa) { startAff(sa.dataset.start); return; }
   const fi = e.target.closest('[data-finish]'); if (fi) { finishAff(fi.dataset.finish, fi); return; }
+  const mt = e.target.closest('[data-meteo]'); if (mt) { openMeteo(mt.dataset.meteo); return; }
+  const nv = e.target.closest('[data-niv]'); if (nv) { openNiveaux(nv.dataset.niv); return; }
+  const t0 = e.target.closest('[data-t0]'); if (t0) { openTemps0(t0.dataset.t0); return; }
+  const ad = e.target.closest('[data-affdel]');
+  if (ad) {
+    const x = DB.get('affectations', ad.dataset.affdel); if (!x) return;
+    confirmInline(ad, `Supprimer la fiche ${x.navireId ? pickLabel('navires', x.navireId) : ''} du ${fmtDate(x.date, true)} ? C'est définitif.`, () => {
+      DB.del('affectations', x.id); toast('Fiche supprimée'); const t = stack[stack.length - 1]; go(t.view, t.params, {replace:true});
+    }, 'Supprimer');
+    return;
+  }
 });
 $('#main').addEventListener('click', e => {
   const el = e.target.closest('[data-go]'); if (!el) return;
