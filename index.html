@@ -304,6 +304,24 @@ a.tel{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 1
 .state .lbl{color:var(--accent)}
 .state .t{font:700 26px/1.1 var(--font-display)}
 .pts{display:grid;gap:6px}
+.qbar{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.qbtn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:64px;padding:6px 2px;border-radius:12px;border:1px solid var(--line);background:var(--surface-2);color:var(--fg);font:600 13px var(--font-body);letter-spacing:.02em;cursor:pointer}
+.qbtn .ico{width:26px;height:26px;color:var(--accent)}
+.hmrow{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center}
+.hmrow input{min-height:52px;font:500 22px var(--font-mono);letter-spacing:.06em;text-align:center}
+.hmrow .btn{padding:0 12px}
+.nivtop{display:grid;grid-template-columns:auto minmax(64px,1fr) auto;gap:8px;align-items:center}
+.nivtop .btn{min-height:48px;padding:0 10px;font-size:15px;line-height:1.1;white-space:normal}
+.nivtop input{min-height:48px;padding:4px;font:500 19px var(--font-mono);text-align:center}
+.nivt{margin-left:8px;padding:2px 8px;border-radius:8px;background:var(--warn-bg);color:var(--warn);font:700 17px var(--font-mono);vertical-align:2px}
+.nivt:empty{display:none}
+.nivalert{margin:0;padding:6px 10px;border-radius:10px;background:var(--neg-bg);color:var(--neg);font-weight:600;font-size:14px}
+.aide{display:grid;gap:10px}
+.aide h3{margin:0;font-size:14px;letter-spacing:.06em;text-transform:uppercase}
+.aide p{margin:0;font-size:15px}
+.chk{display:flex;align-items:center;gap:10px;min-height:48px;font-weight:600}
+.chk input{width:24px;height:24px}
+.pt .eta{border:0;background:none;color:inherit;padding:0;cursor:pointer;text-decoration:underline dotted;text-underline-offset:4px}
 .pt{display:grid;grid-template-columns:minmax(0,1fr) 64px 76px 84px;gap:6px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
 .pt .n{font-weight:700;line-height:1.15}
 .pt .n small{display:block;font-weight:500;font-size:12px;color:var(--muted)}
@@ -380,7 +398,7 @@ a.li{text-decoration:none;color:inherit}
 <script>
 (() => {
 'use strict';
-const VERSION = 'v0.20 · feuille en route, météo et niveaux en fenêtre (26 nov. 2026)';
+const VERSION = 'v0.21 · boutons rapides, niveaux compacts, heures aux 5 minutes, récapitulatif de débarquement (26 nov. 2026)';
 const PWA = !!window.MPP_PWA;
 
 /* ---------- Utilitaires ---------- */
@@ -512,14 +530,17 @@ async function sineNiveaux(cible) {
   }
   return {vals, ko};
 }
-function nivInfoHTML(a) {
-  const s = a.niveauxSrc; if (!s) return '';
-  const age = Math.round((Date.now() - s.t) / 60000), jour = s.cible && new Date(s.cible).toDateString() !== new Date().toDateString() ? fmtDate(new Date(s.cible - new Date(s.cible).getTimezoneOffset() * 60000).toISOString().slice(0, 10)) + ' ' : '';
-  const quoi = s.type === 'mesure' ? `Mesuré à ${hLoc(s.t)}` : `Prévision SPINE pour ${jour}${hLoc(s.cible)}`;
+// Heure affichée dans la barre du titre (en jaune), alerte courte sous la ligne des boutons, détails dans le ⓘ.
+function nivEtat(a) {
+  const s = a.niveauxSrc; if (!s) return {badge:'', alerte:'', detail:'Aucune lecture pour l\'instant.'};
+  const age = Math.round((Date.now() - s.t) / 60000), autreJour = s.cible && new Date(s.cible).toDateString() !== new Date().toDateString();
+  const jour = autreJour ? fmtDate(new Date(s.cible - new Date(s.cible).getTimezoneOffset() * 60000).toISOString().slice(0, 10)) + ' ' : '';
   const vieux = s.type === 'mesure' ? age > NIV_VIEUX : Date.now() - s.lu > 6 * 3600000;
-  const alerte = vieux ? `⚠ Lecture ancienne (${s.type === 'mesure' ? age + ' min' : 'plus de 6 h'}) : à relire. ` : '';
-  return `<div class="verdict ${vieux || (s.ko && s.ko.length) ? 'bad' : 'unk'}">${esc(alerte + quoi)}${s.manuel ? ' · modifié à la main' : ''}
-    <small>${s.ko && s.ko.length ? `Non lu : ${esc(s.ko.join(', '))} (ancienne valeur conservée). ` : ''}Service hydrographique du Canada, données non révisées. Zéro de référence à confirmer.</small></div>`;
+  const badge = (s.type === 'mesure' ? hLoc(s.t) : `SPINE ${autreJour ? jour : ''}${hLoc(s.cible)}`) + (s.manuel ? ' ✎' : '');
+  const al = [vieux ? `Lecture ancienne (${s.type === 'mesure' ? age + ' min' : 'plus de 6 h'}), à relire` : '', s.ko && s.ko.length ? `Non lu : ${s.ko.join(', ')}` : ''].filter(Boolean).join(' · ');
+  const detail = (s.type === 'mesure' ? `Mesuré à ${hLoc(s.t)}.` : `Prévision SPINE pour ${jour}${hLoc(s.cible)}, lue à ${hLoc(s.lu)}.`) + (s.manuel ? ' Modifié à la main.' : '')
+    + (s.ko && s.ko.length ? ` Non lu : ${s.ko.join(', ')} (ancienne valeur conservée).` : '');
+  return {badge, alerte: al ? '⚠ ' + al : '', detail};
 }
 const CHENAL = 11.3; // profondeur minimale du chenal jusqu'à M177 (Port de Montréal, P&P 2025-06-20, 2.1.1)
 const REG_SRC = 'Port de Montréal — Pratiques et procédures, éd. 2025-06-20, section 2.1.1';
@@ -950,7 +971,8 @@ const surRichelieu = a => /richelieu/.test(norm(destNom(a) + ' ' + depNom(a)));
 const degagDe = a => DEGAG.filter(d => !d.si || (d.si === 'lambert' ? versLambert(a) || deLambert(a) : surRichelieu(a)));
 // Heure « 0630 », « 630 », « 6:30 », « 6h30 » → « 06:30 »
 function parseTime(v) {
-  const s = String(v || '').trim(); if (!s) return '';
+  let s = String(v || '').trim(); if (!s) return '';
+  if (/^\d{2}:\d$/.test(s)) s = s.replace(':', ''); // « 83:0 » tapé pour 8 h 30
   const m = s.match(/^(\d{1,2})\s*[:hH.]?\s*(\d{2})$/) || (s.match(/^\d{3,4}$/) && [null, s.slice(0, -2), s.slice(-2)]);
   if (!m) return null; const h = +m[1], mi = +m[2];
   return h < 24 && mi < 60 ? `${pad(h)}:${pad(mi)}` : null;
@@ -1002,6 +1024,11 @@ async function meteoMTR() {
   } finally { clearTimeout(to); }
 }
 const hhmm = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+// Heure arrondie aux 5 minutes près (8 h 22 → 08:20, 8 h 23 → 08:25), demandée par le pilote le 26 nov. 2026.
+const hhmm5 = () => { const d = new Date(), m = Math.round((d.getHours() * 60 + d.getMinutes()) / 5) * 5 % 1440; return `${pad(Math.floor(m / 60))}:${pad(m % 60)}`; };
+// Le « : » se place tout seul pendant la saisie : 1 8 5 0 → 18:50.
+function hmMask(i) { const d = i.value.replace(/\D/g, '').slice(0, 4); i.value = d.length > 2 ? d.slice(0, 2) + ':' + d.slice(2) : d; }
+document.addEventListener('input', e => { if (e.target.matches && e.target.matches('input[data-hm]')) hmMask(e.target); });
 
 function fieldHTML(f, v) {
   const id = 'f_' + f.k;
@@ -1025,7 +1052,7 @@ function fieldHTML(f, v) {
     case 'datetime':
       h = `<label class="field" for="${id}">${lbl}<input id="${id}" name="${f.k}" type="datetime-local" value="${esc(v || (f.blank ? '' : nowLocal()))}">${hint}</label>`; break;
     case 'time':
-      h = `<div class="field"><label class="lbl" for="${id}">${esc(f.label)}</label><span class="timef"><input id="${id}" name="${f.k}" type="text" inputmode="numeric" placeholder="hhmm" autocomplete="off" value="${esc(v || '')}"><button type="button" class="btn" data-now="${id}">Maint.</button></span></div>`; break;
+      h = `<div class="field"><label class="lbl" for="${id}">${esc(f.label)}</label><span class="timef"><input id="${id}" name="${f.k}" type="text" inputmode="numeric" placeholder="hhmm" autocomplete="off" data-hm value="${esc(v || '')}"><button type="button" class="btn" data-now="${id}">Maint.</button></span></div>`; break;
     case 'check':
       h = `<label class="chk" for="${id}"><input id="${id}" name="${f.k}" type="checkbox"${v ? ' checked' : ''}><span>${esc(f.label)}</span></label>`; break;
     case 'selList': {
@@ -1095,7 +1122,7 @@ function mountForm(root, fields, {onSubmit, onDelete, validate, delMsg, onPick})
   });
   root.querySelectorAll('[data-now]').forEach(b => {
     const i = root.querySelector('#' + b.dataset.now);
-    b.onclick = () => { i.value = hhmm(); };
+    b.onclick = () => { i.value = hhmm5(); };
     i.addEventListener('blur', () => { const t = parseTime(i.value); if (t) i.value = t; });
   });
   root.querySelectorAll('[data-powu]').forEach(b => {
@@ -1316,20 +1343,58 @@ function startAff(id) {
   a.statut = 'route'; if (!a.sens) a.sens = guessSens(a);
   DB.put('affectations', a); toast('Affectation démarrée'); go('aff', {id}, {replace: stack[stack.length - 1].view === 'aff'});
 }
-function finishAff(id, btn) {
+function finishAff(id) {
   const a = DB.get('affectations', id); if (!a) return;
-  confirmInline(btn, `Terminer l'affectation ? Heure débarqué : ${a.hDebarque || hhmm()}`, () => {
-    if (!a.hDebarque) a.hDebarque = hhmm(); a.statut = 'fini'; DB.put('affectations', a);
-    const t = tempsTrajet(a); toast(`Débarqué à ${a.hDebarque}${t != null ? ' · trajet ' + dureeFmt(t) : ''}`); go('aff', {id}, {replace:true});
-  }, 'Oui, débarqué', true);
+  if (a.statut === 'fini') { openRecap(id); return; }
+  openSheet('Débarquement', `<p class="sub">Heure de débarquement (arrondie aux 5 minutes, modifiable).</p>
+    ${hmRowHTML('deb', a.hDebarque || hhmm5(), 'Confirmer')}
+    <button class="btn block" id="dbClose">Fermer</button>`, sh => {
+    sh.querySelector('#dbClose').onclick = () => closeSheet(true);
+    hmRowMount(sh, 'deb', h => {
+      a.hDebarque = h; a.statut = 'fini'; DB.put('affectations', a);
+      const t = tempsTrajet(a); toast(`Débarqué à ${h}${t != null ? ' · trajet ' + dureeFmt(t) : ''}`);
+      go('aff', {id}, {replace:true}); openRecap(id);
+    });
+  });
 }
-function openSheet(title, html, mount) {
+function openRecap(id) {
+  const a = DB.get('affectations', id); if (!a) return;
+  const nav = DB.get('navires', a.navireId) || {}, tm = teMax(a), traj = tempsTrajet(a);
+  const L = (k, v) => `<div class="l"><span>${esc(k)}</span><b>${esc(v || '—')}</b></div>`;
+  const aff = a.date && a.date.includes('T') ? a.date.slice(11, 16) : '';
+  openSheet('Récapitulatif', `<p class="sub">${esc(nav.nom || '')} · ${esc(fmtDate(a.date))}</p>
+    <div class="call">${L('Affecté', aff)}${L('Parti', a.hDepart)}${L('Débarqué', a.hDebarque)}${L('Trajet', traj != null ? dureeFmt(traj) : '')}${L('TE le plus creux', fmtM(tm))}</div>
+    <label class="chk"><input type="checkbox" id="rcChk"${a.remFin ? ' checked' : ''}> Ajouter une remarque</label>
+    <textarea id="rcTxt" placeholder="Ex. barge AV 4,2 / AR 4,5 · remorqueur AV 3,8 / AR 4,6"${a.remFin ? '' : ' hidden'}>${esc(a.remFin || '')}</textarea>
+    ${TELS.lpa ? `<a class="btn primary block tall" href="${esc(telHref(TELS.lpa))}">${ic('phone')} Appeler l'APL</a>` : `<button class="btn primary block tall" id="rcNoTel">${ic('phone')} Appeler l'APL</button>`}
+    <button class="btn block" id="rcClose">Fermer</button>`, sh => {
+    const c = sh.querySelector('#rcChk'), t = sh.querySelector('#rcTxt');
+    const enr = () => { const v = c.checked ? t.value.trim() : ''; if ((a.remFin || '') !== v) { a.remFin = v; DB.put('affectations', a); } };
+    c.onchange = () => { t.hidden = !c.checked; if (c.checked) t.focus(); enr(); };
+    t.oninput = enr;
+    const nt = sh.querySelector('#rcNoTel'); if (nt) nt.onclick = () => toast('Numéro absent : restaurez votre sauvegarde dans Réglages.');
+    sh.querySelector('#rcClose').onclick = () => { enr(); closeSheet(true); go('aff', {id}, {replace:true}); };
+  });
+}
+function openSheet(title, html, mount, bar = {}) {
   const sh = $('#sheet');
-  sh.innerHTML = `<div class="sheet-bar"><button class="icon-btn" id="shClose" aria-label="Fermer">${ic('close')}</button><h2>${esc(title)}</h2></div><div class="sheet-body">${html}</div>`;
+  sh.innerHTML = `<div class="sheet-bar"><button class="icon-btn" id="shClose" aria-label="Fermer">${ic('close')}</button><h2>${esc(title)}${bar.inH2 || ''}</h2>${bar.right || ''}</div><div class="sheet-body">${html}</div>`;
   sh.hidden = false;
   if (PWA) { try { history.pushState({sheet:1}, ''); sheetPushed = true; } catch (e) {} }
   sh.onclick = e => { if (e.target.closest('#shClose')) closeSheet(true); };
   if (mount) mount(sh);
+}
+function hmRowHTML(idp, val, okLabel) {
+  return `<div class="hmrow"><input id="${idp}H" type="text" inputmode="numeric" placeholder="hhmm" autocomplete="off" data-hm value="${esc(val)}" aria-label="Heure"><button class="btn" id="${idp}Now">Maintenant</button><button class="btn primary" id="${idp}Ok">✓ ${esc(okLabel)}</button></div>`;
+}
+function hmRowMount(sh, idp, onOk) {
+  const i = sh.querySelector('#' + idp + 'H');
+  sh.querySelector('#' + idp + 'Now').onclick = () => { i.value = hhmm5(); };
+  sh.querySelector('#' + idp + 'Ok').onclick = e => {
+    const h = parseTime(i.value);
+    if (!h) { toast('Heure invalide (ex. 0820)'); i.focus(); return; }
+    i.value = h; onOk(h, e.currentTarget);
+  };
 }
 function openAppel(type, id) {
   const a = DB.get('affectations', id); if (!a) return;
@@ -1350,15 +1415,14 @@ function openAppel(type, id) {
   }
   openSheet('Appel de départ', `<div class="call">${body}</div>
     ${a.hDepart ? `<p class="sub">Parti noté : <b>${esc(a.hDepart)}</b></p>` : ''}
-    ${a.statut === 'route' ? '<button class="btn primary block tall" id="apNote">Noter le départ</button>' : ''}
+    ${a.statut === 'route' ? `<h2 class="sec">Heure de départ</h2>${hmRowHTML('dep', a.hDepart || hhmm5(), 'Confirmer')}` : ''}
     <button class="btn block" id="apClose">Fermer</button>`, sh => {
     sh.querySelector('#apClose').onclick = () => closeSheet(true);
-    const b = sh.querySelector('#apNote'); if (!b) return;
-    const noter = () => {
-      const h = hhmm(); a.hDepart = h; DB.put('affectations', a); closeSheet(true); toast(`Départ noté : ${h}`);
-      setTimeout(() => go('aff', {id}, {replace:true}), 80);
-    };
-    b.onclick = () => { if (a.hDepart) confirmInline(b, `Remplacer ${a.hDepart} par ${hhmm()} ?`, noter, 'Oui, remplacer', true); else noter(); };
+    if (!sh.querySelector('#depOk')) return;
+    hmRowMount(sh, 'dep', (h, b) => {
+      const noter = () => { a.hDepart = h; DB.put('affectations', a); closeSheet(true); toast(`Départ noté : ${h}`); setTimeout(() => go('aff', {id}, {replace:true}), 80); };
+      if (a.hDepart && a.hDepart !== h) confirmInline(b, `Remplacer ${a.hDepart} par ${h} ?`, noter, 'Oui, remplacer', true); else noter();
+    });
   });
 }
 function navetteBtn(l) {
@@ -1386,33 +1450,46 @@ function degagRows(ta, nivOf, liste = DEGAG) {
     return `<div class="verdict ${cls}"><span>${ic} ${esc(d.nom)} : marge ${fmtNum(m)} m${bad ? ' (moins de ' + MARGE_MIN + ' m)' : ''}<small>Hauteur libre ${fmtNum(d.hl)} m${refTxt}${d.gl != null ? ` (verglas ${fmtNum(d.gl)} m : marge ${fmtNum(mg)} m)` : ''}${nivTxt} · tirant d'air ${fmtNum(ta)} m${d.rem ? ' · ' + esc(d.rem) : ''} · ${ATL}, p. ${d.p}</small></span></div>`;
   }).join('');
 }
-function pontsHTML(a, ta) {
+function pontsHTML(a, ta, note = true) {
   const P = a.ponts || {};
   return PONTS.map(p => {
     const x = P[p.c];
     if (!x) return `<div class="verdict unk">${esc(p.nom)} : hauteur libre non lue<small>Touchez « Niveaux en direct » ou « Prévision SPINE ».</small></div>`;
     const m = ta != null ? r2(x.v - ta) : null, cls = m == null ? 'unk' : m < MARGE_MIN ? 'bad' : 'ok';
     return `<div class="verdict ${cls}"><span>${m == null ? '' : m < MARGE_MIN ? '✘ ' : '✔ '}${esc(p.nom)} : hauteur libre ${fmtNum(x.v)} m à ${hLoc(x.t)}${m != null ? ` · marge ${fmtNum(m)} m${m < MARGE_MIN ? ' (moins de ' + MARGE_MIN + ' m)' : ''}` : ' · tirant d\'air inconnu'}<small>${esc(p.rem)}</small></span></div>`;
-  }).join('') + `<p class="reg">Prévision officielle SPINE du Service hydrographique du Canada (dégagement vertical), au centre du chenal, données non révisées. Tirant d'air = creux − TE arrière. Marge minimale : ${MARGE_MIN} m.<span class="src">Aide au calcul — vérifier sur la carte et dans l'ATL 112.</span></p>`;
+  }).join('') + (note ? `<p class="reg">Prévision officielle SPINE du Service hydrographique du Canada (dégagement vertical), au centre du chenal, données non révisées. Tirant d'air = creux − TE arrière. Marge minimale : ${MARGE_MIN} m.<span class="src">Aide au calcul — vérifier sur la carte et dans l'ATL 112.</span></p>` : '');
 }
 function openNiveaux(id) {
   const a = DB.get('affectations', id); if (!a) return;
   const nav = DB.get('navires', a.navireId) || {}, dest = destLieu(a), tm = teMax(a), typ = isPC(nav.type) ? 'pc' : 'au', ta = tirantAir(nav, a);
+  const E0 = nivEtat(a);
   openSheet('Niveaux d\'eau', `
-      <p class="sub">TE retenu : <b>${tm != null ? fmtM(tm) : '—'}</b> (le plus grand) · Largeur ${fmtM(nav.largeur) || '—'} · Tableau ${typ === 'pc' ? 'porte-conteneurs' : 'autres navires'}</p>
-      <button class="btn primary block" id="nivDirect">Niveaux en direct</button>
-      <div class="timef"><input id="nivH" type="text" inputmode="numeric" placeholder="hhmm" autocomplete="off" aria-label="Heure de la prévision"><button class="btn" id="nivPrev">Prévision SPINE</button></div>
-      <div id="nivInfo">${nivInfoHTML(a)}</div>
+      <div class="info aide" id="nivAide" hidden>
+        <h3>Source des niveaux</h3>
+        <p id="nivDet">${esc(E0.detail)}</p>
+        <p>Service hydrographique du Canada (API SINE), données non révisées. Zéro de référence à confirmer. Montréal = Jetée n° 1.</p>
+        <h3>Calcul de la DSQ</h3>
+        <p>Chenal : ${fmtNum(CHENAL)} m jusqu'à M177. DSQ = chenal + niveau − TE. Vitesse permise : ligne de largeur supérieure, sans interpolation. Tableaux DSQ 2013 (Avis 27C), à vérifier contre l'officiel.</p>
+        <h3>Hauteur sous les ponts</h3>
+        <p>Prévision officielle SPINE du Service hydrographique du Canada (dégagement vertical), au centre du chenal, données non révisées.</p>
+        <p>Tirant d'air = creux (quille → mât) − tirant d'eau arrière. Marge minimale demandée : ${MARGE_MIN} m. Sans niveau d'eau, le résultat reste « à confirmer ». Trois-Rivières-Ouest et Laviolette sont mesurés depuis la PMSGM, à 3,1 m au-dessus du zéro des cartes (${ATL}, p. 94).</p>
+        <p class="sub">Aide au calcul — le pilote décide, les SCTM/VTS ont priorité. Vérifier sur la carte et dans l'ATL 112.</p>
+      </div>
+      <div class="nivtop"><button class="btn primary" id="nivDirect">Niveaux en direct</button><input id="nivH" type="text" inputmode="numeric" placeholder="hhmm" autocomplete="off" data-hm aria-label="Heure de la prévision"><button class="btn" id="nivPrev">Prévision SPINE</button></div>
+      <div id="nivInfo">${E0.alerte ? `<p class="nivalert">${esc(E0.alerte)}</p>` : ''}</div>
       <div class="st-table" id="stTable">${STATIONS.map(([c, nm]) => `<div class="st-row"><span class="n">${esc(nm)}</span>
         <input data-st="${c}" type="text" inputmode="decimal" placeholder="niv. m" aria-label="Niveau d'eau ${esc(nm)}" value="${a.niveaux && a.niveaux[c] != null ? esc(String(a.niveaux[c]).replace('.', ',')) : ''}">
         <span class="r" id="res_${c}"></span></div>`).join('')}</div>
       <div id="dsqQuai"></div>
-      <p class="reg">Chenal : ${fmtNum(CHENAL)} m jusqu'à M177. DSQ = chenal + niveau − TE. Vitesse permise : ligne de largeur supérieure, sans interpolation. Tableaux DSQ 2013 (Avis 27C), à vérifier contre l'officiel.<span class="src">Aide au calcul — le pilote décide, les SCTM/VTS ont priorité.</span></p>
       <h2 class="sec">Hauteur libre officielle sous les ponts</h2>
-      <div class="stack" id="ponts">${pontsHTML(a, ta)}</div>
+      <div class="stack" id="ponts">${pontsHTML(a, ta, false)}</div>
       <h2 class="sec">Dégagements aériens (calcul ATL 112)</h2>
-      <div id="degag">${degagHTML(a, ta)}</div>
+      <div id="degag">${degagHTML(a, ta, false)}</div>
+      <p class="sub">TE retenu : <b>${tm != null ? fmtM(tm) : '—'}</b> (le plus grand) · Largeur ${fmtM(nav.largeur) || '—'} · Tableau ${typ === 'pc' ? 'porte-conteneurs' : 'autres navires'}</p>
       <button class="btn block" id="nvClose">Fermer</button>`, r => {
+    const majEtat = () => { const E = nivEtat(a), t = r.querySelector('#nivT'), i = r.querySelector('#nivInfo'), d = r.querySelector('#nivDet');
+      if (t) t.textContent = E.badge; if (i) i.innerHTML = E.alerte ? `<p class="nivalert">${esc(E.alerte)}</p>` : ''; if (d) d.textContent = E.detail; };
+    r.querySelector('#nivI').onclick = () => { const x = r.querySelector('#nivAide'); x.hidden = !x.hidden; if (!x.hidden) x.scrollIntoView({block:'start'}); };
     const save = () => DB.put('affectations', a);
     const onChange = () => { const e = $('#resV'); if (e) e.innerHTML = resumeVoyHTML(a, nav, tm, typ, ta, dest); };
     r.querySelector('#nvClose').onclick = () => closeSheet(true);
@@ -1425,14 +1502,14 @@ function openNiveaux(id) {
             out.innerHTML = `DSQ <b>${fmtNum(dsq)}</b> m<br>${vp.v != null ? `<span class="ok-t">≤ ${vp.v} nœuds</span>` : `<span class="warn-t">${esc(vp.msg)}</span>`}`;
           }
           r.querySelector('#dsqQuai').innerHTML = dsqQuaiHTML(a, dest, tm);
-          r.querySelector('#degag').innerHTML = degagHTML(a, ta);
-          r.querySelector('#ponts').innerHTML = pontsHTML(a, ta);
+          r.querySelector('#degag').innerHTML = degagHTML(a, ta, false);
+          r.querySelector('#ponts').innerHTML = pontsHTML(a, ta, false);
           if (onChange) onChange();
         };
         r.querySelectorAll('[data-st]').forEach(inp => inp.onchange = () => {
           const v = parseNum(inp.value); a.niveaux = a.niveaux || {};
           if (v == null) delete a.niveaux[inp.dataset.st]; else if (Number.isNaN(v)) { toast('Niveau invalide (ex. 0,35 ou -0,20)'); return; } else a.niveaux[inp.dataset.st] = v;
-          a.niveauxH = nowLocal(); if (a.niveauxSrc) a.niveauxSrc.manuel = true; save(); recalc(); r.querySelector('#nivInfo').innerHTML = nivInfoHTML(a);
+          a.niveauxH = nowLocal(); if (a.niveauxSrc) a.niveauxSrc.manuel = true; save(); recalc(); majEtat();
         });
         recalc();
         const bD = r.querySelector('#nivDirect'), bP = r.querySelector('#nivPrev');
@@ -1447,7 +1524,7 @@ function openNiveaux(id) {
           const pv = await sinePonts(cible); if (Object.keys(pv).length) a.ponts = pv;
           a.niveauxH = nowLocal();
           a.niveauxSrc = {type:cible == null ? 'mesure' : 'spine', t:Math.min(...cles.map(c => vals[c].t)), cible, lu:Date.now(), ko};
-          save(); recalc(); if (r.isConnected) r.querySelector('#nivInfo').innerHTML = nivInfoHTML(a);
+          save(); recalc(); if (r.isConnected) majEtat();
           toast((ko.length ? `${cles.length} stations lues sur ${STATIONS.length}` : 'Niveaux à jour') + (Object.keys(pv).length < PONTS.length ? ' · ponts non lus' : ''));
         };
         bD.onclick = () => lire(null, bD);
@@ -1459,7 +1536,7 @@ function openNiveaux(id) {
           if (d.getTime() < Date.now() - 1800000) d.setDate(d.getDate() + 1); // heure passée = demain
           lire(d.getTime(), bP);
         };
-  });
+  }, {inH2:`<span class="nivt" id="nivT">${esc(E0.badge)}</span>`, right:`<button class="icon-btn" id="nivI" aria-label="Informations sur les niveaux d'eau" style="font:700 22px var(--font-body)">ⓘ</button>`});
 }
 function openMeteo(id) {
   const a = DB.get('affectations', id);
@@ -1477,17 +1554,17 @@ function openMeteo(id) {
     lire(false);
   });
 }
-function openTemps0(id) {
+function openTemps0(id, code, vue = 'aff', prevu = '') {
   const a = DB.get('affectations', id); if (!a) return;
-  const c = etaTable(a).rows[0].c, nom = temps0Nom(c), cur = (a.passages || {})[c] || '';
+  const c = code || etaTable(a).rows[0].c, nom = temps0Nom(c), cur = (a.passages || {})[c] || '';
   openSheet('Temps à ' + nom, `
-    <p class="sub">Les heures aux autres CIP se calculent à partir de cette heure.</p>
-    <div class="timef"><input id="t0" type="text" inputmode="numeric" placeholder="hhmm" autocomplete="off" value="${esc(cur)}" aria-label="Heure à ${esc(nom)}"><button class="btn" id="t0Now">Maintenant</button></div>
+    <p class="sub">Les heures aux CIP suivants se calculent à partir de cette heure.${prevu && !cur ? ` Heure prévue : <b>${esc(prevu)}</b>.` : ''}</p>
+    <div class="timef"><input id="t0" type="text" inputmode="numeric" placeholder="hhmm" autocomplete="off" data-hm value="${esc(cur || prevu)}" aria-label="Heure à ${esc(nom)}"><button class="btn" id="t0Now">Maintenant</button></div>
     <button class="btn primary block tall" id="t0Ok">Enregistrer</button>
     ${cur ? '<button class="btn block" id="t0Del">Effacer l\'heure</button>' : ''}
     <button class="btn block" id="t0Close">Fermer</button>`, sh => {
-    const fin = msg => { DB.put('affectations', a); closeSheet(true); toast(msg); setTimeout(() => go('aff', {id}, {replace:true}), 80); };
-    sh.querySelector('#t0Now').onclick = () => { sh.querySelector('#t0').value = hhmm(); };
+    const fin = msg => { DB.put('affectations', a); closeSheet(true); toast(msg); setTimeout(() => go(vue, {id}, {replace:true}), 80); };
+    sh.querySelector('#t0Now').onclick = () => { sh.querySelector('#t0').value = hhmm5(); };
     sh.querySelector('#t0Ok').onclick = () => {
       const h = parseTime(sh.querySelector('#t0').value);
       if (!h) { toast('Heure invalide (ex. 1630)'); sh.querySelector('#t0').focus(); return; }
@@ -1537,9 +1614,9 @@ function resumeVoyHTML(a, nav, tm, typ, ta, dest) {
     <p class="sub" style="margin:0">Rond vert : vitesse permise de plus de ${V_RIVIERE} nœuds dans la rivière (sinon le navire ne part pas) · vitesse prévue permise partout · DSQ d'au moins ${fmtNum(DSQ_MANOEUVRE)} m pour la manœuvre · air d'au moins ${MARGE_MIN} m. Anneau rouge : à vérifier. Pointillé : donnée manquante. Les niveaux se lisent avec le bouton « Niveaux d'eau ».</p>`;
 }
 const DEGAG_NOTE = `<p class="reg">Tirant d'air = creux (quille → mât) − tirant d'eau arrière. Marge minimale demandée : ${MARGE_MIN} m. Sans niveau d'eau, le résultat reste « à confirmer ». Trois-Rivières-Ouest et Laviolette sont mesurés depuis la PMSGM, à 3,1 m au-dessus du zéro des cartes (${ATL}, p. 94).<span class="src">Aide au calcul — vérifier sur la carte et dans l'ATL 112.</span></p>`;
-function degagHTML(a, ta) {
+function degagHTML(a, ta, note = true) {
   if (ta == null) return `<p class="empty">Entrez le creux (quille → mât) et le tirant d'eau arrière pour calculer le tirant d'air.</p>`;
-  return `<div class="stack">${degagRows(ta, st => a.niveaux ? a.niveaux[st] : null, degagDe(a))}</div>${DEGAG_NOTE}`;
+  return `<div class="stack">${degagRows(ta, st => a.niveaux ? a.niveaux[st] : null, degagDe(a))}</div>${note ? DEGAG_NOTE : ''}`;
 }
 // Photos (carte du pilote, ship particulars) : gardées dans le téléphone (IndexedDB), réduites à 1600 px.
 const PH = {
@@ -2011,17 +2088,18 @@ const VIEWS = {
     const acts = st === 'prep'
       ? `<button class="btn primary block tall" data-start="${id}">▶ Démarrer l'affectation</button>`
       : st === 'route'
-        ? `<div class="row"><button class="btn tall" data-go="affVoy" data-id="${id}">${ic('ship')} Données du navire</button><button class="btn primary tall" data-appel="depart" data-id="${id}">${ic('vhf')} Appel de départ</button></div>
+        ? `<div class="qbar"><button class="qbtn" data-go="affVoy" data-id="${id}">${ic('ship')}Navire</button><button class="qbtn" data-meteo="${id}">${ic('meteo')}Météo</button><button class="qbtn" data-niv="${id}">${ic('vague')}W/L</button><button class="qbtn" data-appel="depart" data-id="${id}">${ic('vhf')}Départ</button></div>
           <div class="row"><button class="btn tall" data-go="heures" data-id="${id}">⏱ CIP</button><button class="btn tall" data-t0="${id}"><span>⏱ Temps à ${esc(t0nom)}<small>${esc(t0h || 'à entrer')}</small></span></button></div>
           ${versLambert(a) ? `<button class="btn block" data-appel="tracy" data-id="${id}">${ic('vhf')} Appel à Tracy (Voie maritime)</button>` : ''}
           ${TELS.lpa ? `<a class="btn block tall" href="${esc(telHref(TELS.lpa))}">${ic('phone')} Appeler l'APL</a>` : `<button class="btn block tall" data-notel="1">${ic('phone')} Appeler l'APL</button>`}
           <div class="row">${navetteBtn(dest)}<button class="btn" data-finish="${id}">⚓ Débarqué</button></div>`
-        : `<div class="row"><button class="btn" data-go="heures" data-id="${id}">⏱ CIP</button><button class="btn" data-appel="depart" data-id="${id}">${ic('vhf')} Résumé</button></div>`;
+        : `<div class="row"><button class="btn" data-go="heures" data-id="${id}">⏱ CIP</button><button class="btn" data-appel="depart" data-id="${id}">${ic('vhf')} Résumé</button></div>
+          <button class="btn block" data-finish="${id}">⚓ Récapitulatif du débarquement</button>`;
 
     return {title:nav.nom || 'Fiche navire', action:{label:'Modifier', icon:'edit', fn:() => go('affEdit', {id})}, html:`
       <div class="sub"><b>${ST[st]}</b> · ${k.sr != null ? `n° ${k.sr} du stretch · ` : ''}n° ${k.yr} de ${k.y}${traj != null ? ` · trajet <b>${dureeFmt(traj)}</b>` : ''}</div>
       ${acts}
-      <div class="row"><button class="btn" data-meteo="${id}">${ic('meteo')} Météo</button><button class="btn" data-niv="${id}">${ic('vague')} Niveaux d'eau</button></div>
+      ${st === 'route' ? '' : `<div class="row"><button class="btn" data-meteo="${id}">${ic('meteo')} Météo</button><button class="btn" data-niv="${id}">${ic('vague')} Niveaux d'eau</button></div>`}
       <button class="btn block" data-go="briefing" data-aff-id="${id}">${ic('eye')} Notes de manœuvre${al ? ` · ${al} alerte${al > 1 ? 's' : ''}` : ''}</button>
       ${reglesFiche(a, nav, dest).map(regHTML).join('')}
       ${ancVerdictHTML(dest, a, nav)}
@@ -2038,7 +2116,7 @@ const VIEWS = {
       <div class="rpt"><h3>Voyage</h3><div class="kv">${KT('De', depNom(a))}${KT('Vers', destNom(a))}${KV('ETA', etaTxt(a))}
         ${KT('Cargo', [a.cargo, a.quantite].filter(Boolean).join(' · '))}${KT('DG', dgTxt(a))}${KV('TE AV', fmtM(a.teAv))}${KV('TE AR', fmtM(a.teAr))}${KV('T. d\'air', fmtM(ta))}
         ${KT('Agent', a.agent)}</div></div>
-      <div class="rpt"><h3>Temps</h3><div class="kv">${KV('Affecté', fmtDate(a.date, true))}${KV('Parti', a.hDepart)}${KV('Débarqué', a.hDebarque)}${KV('Trajet', traj != null ? dureeFmt(traj) : '')}
+      <div class="rpt"><h3>Temps</h3><div class="kv">${KV('Affecté', fmtDate(a.date, true))}${KV('Parti', a.hDepart)}${KV('Débarqué', a.hDebarque)}${KV('Trajet', traj != null ? dureeFmt(traj) : '')}${KT('Remarque', a.remFin)}
         ${KV('Tugs', a.hTugs)}${KV('Linesmen', a.hLines)}${a.releve ? KV('Relève', a.hReleve || 'oui') : ''}${pasTxt}</div></div>
       <h2 class="sec">Remorqueurs et bittes</h2>
       ${tugs.length ? tugs.map(([pos, tid]) => tugHTML(pos, DB.get('lieux', tid), nav)).join('') : '<p class="empty">Aucun remorqueur choisi.</p>'}
@@ -2054,7 +2132,7 @@ const VIEWS = {
       <h2 class="sec">Journal d'événements <span class="cnt">${journal.length}</span></h2>
       <div class="stack">${journal.map(e => `<div class="ev"><time>${esc(e.h)}</time><span>${esc(e.texte)}</span>
         <span><button class="btn" data-evcopy="${e.id}" title="Copier en note de manœuvre">→ Note</button> <button class="icon-btn sm" data-evdel="${e.id}" aria-label="Supprimer">${ic('close')}</button></span></div>`).join('') || '<p class="empty">Ex. « remorqueurs arrivés », « amarre brisée ».</p>'}</div>
-      <div class="addrow"><span class="timef" style="grid-template-columns:1fr"><input id="evH" type="text" inputmode="numeric" value="${hhmm()}" aria-label="Heure"></span><input id="evT" type="text" placeholder="Événement…" aria-label="Texte de l'événement"></div>
+      <div class="addrow"><span class="timef" style="grid-template-columns:1fr"><input id="evH" type="text" inputmode="numeric" data-hm value="${hhmm()}" aria-label="Heure"></span><input id="evT" type="text" placeholder="Événement…" aria-label="Texte de l'événement"></div>
       <button class="btn primary block" id="evAdd">${ic('plus', 'sm')} Événement</button>
       <h2 class="h2">Manœuvres et notes <span class="cnt">${mans.length}</span></h2>
       <div class="row"><button class="btn primary" data-go="manEdit" data-aff-id="${id}">${ic('plus')} Manœuvre</button><button class="btn" data-go="noteEdit" data-aff-id="${id}">${ic('plus')} Note</button></div>
@@ -2091,9 +2169,9 @@ const VIEWS = {
       <div class="pts"><div class="pt hd"><span>Point</span><span>Vitesse</span><span>Prévu</span><span>Réel</span></div>
       ${T.rows.map(r => `<div class="pt"><span class="n">${esc(r.nom)}<small>${r.dist != null ? fmtNum(r.dist) + ' NM' + (r.doute ? ' · à vérifier' : '') : 'départ'}</small></span>
         ${r.k ? `<input data-vseg="${r.k}" type="text" inputmode="decimal" value="${fmtNum(r.v)}" aria-label="Vitesse vers ${esc(r.nom)}">` : '<span></span>'}
-        <span class="eta${r.reel ? ' real' : ''}">${r.eta != null ? tFmt(r.eta) : '—'}</span>
-        <button class="btn${r.reel ? '' : ' primary'}" data-log="${r.c}">${r.reel ? esc(r.reel) : 'Maint.'}</button></div>`).join('')}</div>
-      <p class="hint">« Maint. » inscrit l'heure réelle au point d'appel. Les heures suivantes se recalculent à partir de ce point. Toucher deux fois une heure inscrite l'efface.</p>
+        <button class="eta${r.reel ? ' real' : ''}" data-hedit="${r.c}" data-prevu="${r.eta != null ? tFmt(r.eta) : ''}" aria-label="Changer l'heure à ${esc(r.nom)}">${r.eta != null ? tFmt(r.eta) : '—'}</button>
+        <button class="btn${r.reel ? '' : ' primary'}" data-log="${r.c}" data-prevu="${r.eta != null ? tFmt(r.eta) : ''}">${r.reel ? esc(r.reel) : 'Maint.'}</button></div>`).join('')}</div>
+      <p class="hint">« Maint. » inscrit l'heure au point d'appel, arrondie aux 5 minutes. Touchez une heure (prévue ou inscrite) pour entrer une heure précise ou l'effacer. Les heures suivantes se recalculent à partir de ce point.</p>
       <p class="reg">Temps = distance ÷ vitesse, d'un point à l'autre. Distances du tableur du pilote (fichier_navigation.xlsx) ; tronçons CONQ → CSM → 110 à remesurer.<span class="src">Aide au calcul — vitesse sur l'eau, sans le courant. Les SCTM/VTS ont priorité.</span></p>`,
       mount: r => {
         const rer = () => go('heures', {id}, {replace:true}), save = () => DB.put('affectations', a);
@@ -2101,14 +2179,11 @@ const VIEWS = {
         r.querySelector('#hv').onchange = e => { const v = parseNum(e.target.value); if (!v) { toast('Vitesse invalide'); return; } a.vitesse = v; save(); rer(); };
         r.querySelector('#hvAll').onclick = () => { const v = parseNum(r.querySelector('#hv').value); if (v) a.vitesse = v; a.vSeg = {}; save(); rer(); };
         r.querySelectorAll('[data-vseg]').forEach(i => i.onchange = () => { const v = parseNum(i.value); a.vSeg = a.vSeg || {}; if (!v) delete a.vSeg[i.dataset.vseg]; else a.vSeg[i.dataset.vseg] = v; save(); rer(); });
-        let armed = null;
+        r.querySelectorAll('[data-hedit]').forEach(b => b.onclick = () => openTemps0(id, b.dataset.hedit, 'heures', b.dataset.prevu));
         r.querySelectorAll('[data-log]').forEach(b => b.onclick = () => {
           a.passages = a.passages || {}; const c = b.dataset.log;
-          if (a.passages[c]) {
-            if (armed !== c) { armed = c; toast(`Touchez encore pour effacer l'heure à ${ptName(c)}`); setTimeout(() => { armed = null; }, 3000); return; }
-            delete a.passages[c]; save(); toast('Heure effacée'); rer(); return;
-          }
-          a.passages[c] = hhmm(); save(); toast(`${ptName(c)} : ${a.passages[c]} inscrit`); rer();
+          if (a.passages[c]) { openTemps0(id, c, 'heures', b.dataset.prevu); return; }
+          a.passages[c] = hhmm5(); save(); toast(`${ptName(c)} : ${a.passages[c]} inscrit`); rer();
         });
       }};
   },
@@ -2347,7 +2422,7 @@ $('#main').addEventListener('click', e => {
   const ap = e.target.closest('[data-appel]'); if (ap) { openAppel(ap.dataset.appel, ap.dataset.id); return; }
   if (e.target.closest('[data-notel]')) { toast('Numéro absent : restaurez votre sauvegarde dans Réglages.'); return; }
   const sa = e.target.closest('[data-start]'); if (sa) { startAff(sa.dataset.start); return; }
-  const fi = e.target.closest('[data-finish]'); if (fi) { finishAff(fi.dataset.finish, fi); return; }
+  const fi = e.target.closest('[data-finish]'); if (fi) { finishAff(fi.dataset.finish); return; }
   const mt = e.target.closest('[data-meteo]'); if (mt) { openMeteo(mt.dataset.meteo); return; }
   const nv = e.target.closest('[data-niv]'); if (nv) { openNiveaux(nv.dataset.niv); return; }
   const t0 = e.target.closest('[data-t0]'); if (t0) { openTemps0(t0.dataset.t0); return; }
