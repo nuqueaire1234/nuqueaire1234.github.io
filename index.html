@@ -374,6 +374,9 @@ main.home .searchbtn{min-height:44px;border-radius:12px}
   .hbtn.live{animation:pulse 2.8s ease-in-out infinite}
   :root[data-theme="nuit"][data-pulse="off"] .hbtn.live{animation:none}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.68}}
+  .btn.blink{animation:blink 2.6s ease-in-out infinite}
+  :root[data-theme="nuit"][data-pulse="off"] .btn.blink{animation:none}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 }
 a.li{text-decoration:none;color:inherit}
 .favb{flex:none;width:44px;height:44px;border:0;border-radius:50%;background:none;color:var(--muted)}
@@ -398,7 +401,7 @@ a.li{text-decoration:none;color:inherit}
 <script>
 (() => {
 'use strict';
-const VERSION = 'v0.21 · boutons rapides, niveaux compacts, heures aux 5 minutes, récapitulatif de débarquement (26 nov. 2026)';
+const VERSION = 'v0.22 · vitesses W/L dans les CIP, page Transport, APL clignotant (26 nov. 2026)';
 const PWA = !!window.MPP_PWA;
 
 /* ---------- Utilitaires ---------- */
@@ -597,7 +600,13 @@ const segKey = (a, b) => SEG[a + '-' + b] != null ? a + '-' + b : b + '-' + a;
 // si = obstacle affiché sur la fiche seulement pour ce trajet. gl = sous verglas.
 const ATL = 'ATL 112 (éd. 2025-05)';
 const MARGE_MIN = 1; // Marge minimale du dégagement aérien demandée par le pilote (22 nov. 2026)
-const V_RIVIERE = 7; // Rivière : le navire doit pouvoir faire plus de 7 nœuds, sinon il ne part pas (pilote, 26 nov. 2026)
+const V_RIVIERE = 7;
+// Règle du pilote (26 nov. 2026) : on compte toujours 2 nœuds de courant. Montant : fond = eau − 2. Descendant : fond = eau + 2.
+const COURANT = 2;
+const fondVersEau = (v, up) => up ? v + COURANT : v - COURANT;
+const eauVersFond = (v, up) => up ? v - COURANT : v + COURANT;
+// Station de niveau d'eau retenue pour chaque tronçon des CIP (choix du pilote, 26 nov. 2026). Tronçons vers Saint-Lambert : à préciser.
+const SEG_STATION = {'PDO-YAM':'LSP', 'YAM-IDB':'LSP', 'IDB-TRACY':'SOR', 'TRACY-CONQ':'SOR', 'CONQ-CSM':'VAR', 'CSM-110':'VAR'}; // Rivière : le navire doit pouvoir faire plus de 7 nœuds, sinon il ne part pas (pilote, 26 nov. 2026)
 const DSQ_MANOEUVRE = 0.3; // Manœuvre au quai : DSQ de 0,30 m (pilote, 26 nov. 2026 ; P&P Port de Montréal 2.1.1)
 const DEGAG = [
   {nom:'Câble, Trois-Rivières-Ouest', hl:50, gl:37, zc:3.1, ref:'PMSGM', st:'TRV', p:94},
@@ -1480,13 +1489,13 @@ function openNiveaux(id) {
       <div class="st-table" id="stTable">${STATIONS.map(([c, nm]) => `<div class="st-row"><span class="n">${esc(nm)}</span>
         <input data-st="${c}" type="text" inputmode="decimal" placeholder="niv. m" aria-label="Niveau d'eau ${esc(nm)}" value="${a.niveaux && a.niveaux[c] != null ? esc(String(a.niveaux[c]).replace('.', ',')) : ''}">
         <span class="r" id="res_${c}"></span></div>`).join('')}</div>
+      <button class="btn block" id="nvClose">Fermer</button>
       <div id="dsqQuai"></div>
       <h2 class="sec">Hauteur libre officielle sous les ponts</h2>
       <div class="stack" id="ponts">${pontsHTML(a, ta, false)}</div>
       <h2 class="sec">Dégagements aériens (calcul ATL 112)</h2>
       <div id="degag">${degagHTML(a, ta, false)}</div>
-      <p class="sub">TE retenu : <b>${tm != null ? fmtM(tm) : '—'}</b> (le plus grand) · Largeur ${fmtM(nav.largeur) || '—'} · Tableau ${typ === 'pc' ? 'porte-conteneurs' : 'autres navires'}</p>
-      <button class="btn block" id="nvClose">Fermer</button>`, r => {
+      <p class="sub">TE retenu : <b>${tm != null ? fmtM(tm) : '—'}</b> (le plus grand) · Largeur ${fmtM(nav.largeur) || '—'} · Tableau ${typ === 'pc' ? 'porte-conteneurs' : 'autres navires'}</p>`, r => {
     const majEtat = () => { const E = nivEtat(a), t = r.querySelector('#nivT'), i = r.querySelector('#nivInfo'), d = r.querySelector('#nivDet');
       if (t) t.textContent = E.badge; if (i) i.innerHTML = E.alerte ? `<p class="nivalert">${esc(E.alerte)}</p>` : ''; if (d) d.textContent = E.detail; };
     r.querySelector('#nivI').onclick = () => { const x = r.querySelector('#nivAide'); x.hidden = !x.hidden; if (!x.hidden) x.scrollIntoView({block:'start'}); };
@@ -1576,7 +1585,7 @@ function openTemps0(id, code, vue = 'aff', prevu = '') {
 }
 const temps0Nom = c => c === 'PDO' ? 'Pointe-des-Ormes' : c === '110' ? 'la 110' : ptName(c);
 function resumeVoyHTML(a, nav, tm, typ, ta, dest) {
-  const up = (a.sens || guessSens(a)) === 'montant', vPrev = a.vitesse || (up ? 10 : 14);
+  const up = (a.sens || guessSens(a)) === 'montant', vPrev = a.vitesse || (up ? 10 : 14), vEau = fondVersEau(vPrev, up);
   const D = c => `<i class="dot ${c}"></i>`;
   let tousOk = true, manque = false;
   const lignes = STATIONS.map(([c, nm]) => {
@@ -1584,7 +1593,7 @@ function resumeVoyHTML(a, nav, tm, typ, ta, dest) {
     if (nv == null || tm == null) { manque = true; return `<div class="rv"><span>${esc(nm)}</span><b>${tm == null ? 'TE ?' : 'niveau ?'}${D('gris')}</b></div>`; }
     const dsq = r2(CHENAL + nv - tm), vp = vitessePermise(typ, nav.largeur, dsq);
     const vTxt = vp.v != null ? vp.v + ' nd' : nav.largeur == null ? 'largeur ?' : nav.largeur > 44 ? 'hors tableau' : 'moins de 7 nd';
-    if (vp.v == null || vp.v < vPrev) tousOk = false;
+    if (vp.v == null || vp.v < vEau) tousOk = false;
     return `<div class="rv"><span>${esc(nm)}</span><b>DSQ ${fmtNum(dsq)} m · ${vTxt}${D(vp.v != null && vp.v > V_RIVIERE ? 'vert' : nav.largeur == null ? 'gris' : 'rouge')}</b></div>`;
   });
   // DSQ pour la manœuvre au quai de destination
@@ -1607,11 +1616,11 @@ function resumeVoyHTML(a, nav, tm, typ, ta, dest) {
     air = pire ? `<b>${fmtNum(pire.m)} m${D(bad ? 'rouge' : inc ? 'gris' : 'vert')}<small>${esc(pire.nom)}${inc && !bad ? ' · niveau manquant' : ''}</small></b>` : `<b>aucun obstacle</b>`;
   }
   return `<h3>Résumé de voyage</h3>
-    <div class="rv"><span>Vitesse prévue</span><b>${fmtNum(vPrev)} nd · ${up ? 'montant' : 'descendant'}${D(manque ? 'gris' : tousOk ? 'vert' : 'rouge')}</b></div>
+    <div class="rv"><span>Vitesse prévue</span><b>${fmtNum(vPrev)} nd fond · ${fmtNum(vEau)} nd eau${D(manque ? 'gris' : tousOk ? 'vert' : 'rouge')}<small>${up ? 'montant' : 'descendant'} · courant compté : ${COURANT} nœuds</small></b></div>
     ${lignes.join('')}
     <div class="rv"><span>DSQ pour la manœuvre</span>${man}</div>
     <div class="rv"><span>Dégagement aérien le plus serré</span>${air}</div>
-    <p class="sub" style="margin:0">Rond vert : vitesse permise de plus de ${V_RIVIERE} nœuds dans la rivière (sinon le navire ne part pas) · vitesse prévue permise partout · DSQ d'au moins ${fmtNum(DSQ_MANOEUVRE)} m pour la manœuvre · air d'au moins ${MARGE_MIN} m. Anneau rouge : à vérifier. Pointillé : donnée manquante. Les niveaux se lisent avec le bouton « Niveaux d'eau ».</p>`;
+    <p class="sub" style="margin:0">Rond vert : vitesse permise de plus de ${V_RIVIERE} nœuds dans la rivière (sinon le navire ne part pas) · vitesse prévue permise partout (convertie sur l'eau : ${up ? '+' : '−'} ${COURANT} nœuds de courant) · DSQ d'au moins ${fmtNum(DSQ_MANOEUVRE)} m pour la manœuvre · air d'au moins ${MARGE_MIN} m. Anneau rouge : à vérifier. Pointillé : donnée manquante. Les niveaux se lisent avec le bouton « Niveaux d'eau ».</p>`;
 }
 const DEGAG_NOTE = `<p class="reg">Tirant d'air = creux (quille → mât) − tirant d'eau arrière. Marge minimale demandée : ${MARGE_MIN} m. Sans niveau d'eau, le résultat reste « à confirmer ». Trois-Rivières-Ouest et Laviolette sont mesurés depuis la PMSGM, à 3,1 m au-dessus du zéro des cartes (${ATL}, p. 94).<span class="src">Aide au calcul — vérifier sur la carte et dans l'ATL 112.</span></p>`;
 function degagHTML(a, ta, note = true) {
@@ -2089,10 +2098,11 @@ const VIEWS = {
       ? `<button class="btn primary block tall" data-start="${id}">▶ Démarrer l'affectation</button>`
       : st === 'route'
         ? `<div class="qbar"><button class="qbtn" data-go="affVoy" data-id="${id}">${ic('ship')}Navire</button><button class="qbtn" data-meteo="${id}">${ic('meteo')}Météo</button><button class="qbtn" data-niv="${id}">${ic('vague')}W/L</button><button class="qbtn" data-appel="depart" data-id="${id}">${ic('vhf')}Départ</button></div>
+          <button class="btn block" data-go="briefing" data-aff-id="${id}">${ic('eye')} Notes de manœuvre${al ? ` · ${al} alerte${al > 1 ? 's' : ''}` : ''}</button>
+          <div class="row"><button class="btn" data-go="bottin" data-s="transport">${ic('taxi')} Transport</button><button class="btn" data-finish="${id}">⚓ Débarqué</button></div>
           <div class="row"><button class="btn tall" data-go="heures" data-id="${id}">⏱ CIP</button><button class="btn tall" data-t0="${id}"><span>⏱ Temps à ${esc(t0nom)}<small>${esc(t0h || 'à entrer')}</small></span></button></div>
           ${versLambert(a) ? `<button class="btn block" data-appel="tracy" data-id="${id}">${ic('vhf')} Appel à Tracy (Voie maritime)</button>` : ''}
-          ${TELS.lpa ? `<a class="btn block tall" href="${esc(telHref(TELS.lpa))}">${ic('phone')} Appeler l'APL</a>` : `<button class="btn block tall" data-notel="1">${ic('phone')} Appeler l'APL</button>`}
-          <div class="row">${navetteBtn(dest)}<button class="btn" data-finish="${id}">⚓ Débarqué</button></div>`
+          ${a.aplAppele ? '' : TELS.lpa ? `<a class="btn block tall blink" data-apl="${id}" href="${esc(telHref(TELS.lpa))}">${ic('phone')} Appeler l'APL</a>` : `<button class="btn block tall blink" data-notel="1">${ic('phone')} Appeler l'APL</button>`}`
         : `<div class="row"><button class="btn" data-go="heures" data-id="${id}">⏱ CIP</button><button class="btn" data-appel="depart" data-id="${id}">${ic('vhf')} Résumé</button></div>
           <button class="btn block" data-finish="${id}">⚓ Récapitulatif du débarquement</button>`;
 
@@ -2100,7 +2110,7 @@ const VIEWS = {
       <div class="sub"><b>${ST[st]}</b> · ${k.sr != null ? `n° ${k.sr} du stretch · ` : ''}n° ${k.yr} de ${k.y}${traj != null ? ` · trajet <b>${dureeFmt(traj)}</b>` : ''}</div>
       ${acts}
       ${st === 'route' ? '' : `<div class="row"><button class="btn" data-meteo="${id}">${ic('meteo')} Météo</button><button class="btn" data-niv="${id}">${ic('vague')} Niveaux d'eau</button></div>`}
-      <button class="btn block" data-go="briefing" data-aff-id="${id}">${ic('eye')} Notes de manœuvre${al ? ` · ${al} alerte${al > 1 ? 's' : ''}` : ''}</button>
+      ${st === 'route' ? '' : `<button class="btn block" data-go="briefing" data-aff-id="${id}">${ic('eye')} Notes de manœuvre${al ? ` · ${al} alerte${al > 1 ? 's' : ''}` : ''}</button>`}
       ${reglesFiche(a, nav, dest).map(regHTML).join('')}
       ${ancVerdictHTML(dest, a, nav)}
       ${a.teAv != null && a.teAr != null && a.teAv > a.teAr ? `<div class="verdict bad">⚠ Navire sur le nez : TE AV ${fmtM(a.teAv)} > TE AR ${fmtM(a.teAr)}</div>` : ''}
@@ -2166,18 +2176,36 @@ const VIEWS = {
       <div class="seg">${[['montant', 'Montant'], ['descendant', 'Descendant']].map(([v, l]) => `<label class="seg-opt"><input type="radio" name="hsens" value="${v}"${T.sens === v ? ' checked' : ''}><span>${l}</span></label>`).join('')}</div>
       <div class="grid2"><label class="field"><span class="lbl">Vitesse partout</span><span class="with-unit"><input id="hv" type="text" inputmode="decimal" value="${fmtNum(T.vDef)}"><span>nd</span></span></label>
         <div class="field"><span class="lbl">&nbsp;</span><button class="btn" id="hvAll">Même vitesse partout</button></div></div>
+      <button class="btn block" id="hvWL">${ic('vague')} Vitesses W/L (niveaux d'eau)</button>
       <div class="pts"><div class="pt hd"><span>Point</span><span>Vitesse</span><span>Prévu</span><span>Réel</span></div>
       ${T.rows.map(r => `<div class="pt"><span class="n">${esc(r.nom)}<small>${r.dist != null ? fmtNum(r.dist) + ' NM' + (r.doute ? ' · à vérifier' : '') : 'départ'}</small></span>
         ${r.k ? `<input data-vseg="${r.k}" type="text" inputmode="decimal" value="${fmtNum(r.v)}" aria-label="Vitesse vers ${esc(r.nom)}">` : '<span></span>'}
         <button class="eta${r.reel ? ' real' : ''}" data-hedit="${r.c}" data-prevu="${r.eta != null ? tFmt(r.eta) : ''}" aria-label="Changer l'heure à ${esc(r.nom)}">${r.eta != null ? tFmt(r.eta) : '—'}</button>
         <button class="btn${r.reel ? '' : ' primary'}" data-log="${r.c}" data-prevu="${r.eta != null ? tFmt(r.eta) : ''}">${r.reel ? esc(r.reel) : 'Maint.'}</button></div>`).join('')}</div>
       <p class="hint">« Maint. » inscrit l'heure au point d'appel, arrondie aux 5 minutes. Touchez une heure (prévue ou inscrite) pour entrer une heure précise ou l'effacer. Les heures suivantes se recalculent à partir de ce point.</p>
-      <p class="reg">Temps = distance ÷ vitesse, d'un point à l'autre. Distances du tableur du pilote (fichier_navigation.xlsx) ; tronçons CONQ → CSM → 110 à remesurer.<span class="src">Aide au calcul — vitesse sur l'eau, sans le courant. Les SCTM/VTS ont priorité.</span></p>`,
+      <p class="reg">Temps = distance ÷ vitesse, d'un point à l'autre. Distances du tableur du pilote (fichier_navigation.xlsx) ; tronçons CONQ → CSM → 110 à remesurer. « Vitesses W/L » : vitesse permise sur l'eau (niveaux d'eau) convertie sur le fond avec ${COURANT} nœuds de courant (montant − ${COURANT}, descendant + ${COURANT}) ; stations : Lac Saint-Pierre jusqu'à Île-des-Barques, Sorel jusqu'à Contrecœur, Varennes jusqu'à la 110.<span class="src">Aide au calcul — vitesse sur l'eau, sans le courant. Les SCTM/VTS ont priorité.</span></p>`,
       mount: r => {
         const rer = () => go('heures', {id}, {replace:true}), save = () => DB.put('affectations', a);
         r.querySelectorAll('input[name="hsens"]').forEach(i => i.onchange = () => { a.sens = i.value; a.vitesse = null; a.vSeg = {}; save(); rer(); });
         r.querySelector('#hv').onchange = e => { const v = parseNum(e.target.value); if (!v) { toast('Vitesse invalide'); return; } a.vitesse = v; save(); rer(); };
         r.querySelector('#hvAll').onclick = () => { const v = parseNum(r.querySelector('#hv').value); if (v) a.vitesse = v; a.vSeg = {}; save(); rer(); };
+        r.querySelector('#hvWL').onclick = () => {
+          // Garde la vitesse prévue ; ne la baisse que là où la vitesse permise (sur l'eau, convertie sur le fond) est plus basse.
+          const nav = DB.get('navires', a.navireId) || {}, tm = teMax(a), typ = isPC(nav.type) ? 'pc' : 'au', up = T.sens === 'montant';
+          if (tm == null) { toast('Tirant d\'eau manquant'); return; }
+          if (!a.niveaux || !Object.keys(a.niveaux).length) { toast('Lisez d\'abord les niveaux (bouton W/L)'); return; }
+          a.vSeg = {}; let baisse = 0; const manque = [];
+          for (const row of T.rows.filter(x => x.k)) {
+            const st = SEG_STATION[row.k], nv = st && a.niveaux[st];
+            if (!st || nv == null) { manque.push(row.nom); continue; }
+            const vp = vitessePermise(typ, nav.largeur, r2(CHENAL + nv - tm));
+            if (vp.v == null) { manque.push(row.nom); continue; }
+            const vf = eauVersFond(vp.v, up);
+            if (vf < T.vDef) { a.vSeg[row.k] = vf; baisse++; }
+          }
+          save(); rer();
+          toast((baisse ? `${baisse} tronçon${baisse > 1 ? 's' : ''} ralenti${baisse > 1 ? 's' : ''}` : 'Vitesse prévue permise partout') + (manque.length ? ` · non calculé : ${manque.join(', ')}` : ''));
+        };
         r.querySelectorAll('[data-vseg]').forEach(i => i.onchange = () => { const v = parseNum(i.value); a.vSeg = a.vSeg || {}; if (!v) delete a.vSeg[i.dataset.vseg]; else a.vSeg[i.dataset.vseg] = v; save(); rer(); });
         r.querySelectorAll('[data-hedit]').forEach(b => b.onclick = () => openTemps0(id, b.dataset.hedit, 'heures', b.dataset.prevu));
         r.querySelectorAll('[data-log]').forEach(b => b.onclick = () => {
@@ -2221,7 +2249,7 @@ const VIEWS = {
   },
 
   /* Bottin téléphonique */
-  bottin({q = '', s = ''}) {
+  bottin({q = '', s = '', t = ''}) {
     s = s || bottinDef();
     const favs = DB.d.reglages.favoris, fk = p => p.code + '|' + p.nom;
     const tel = t => t ? `<a class="tel" href="${esc(telHref(t))}">📞 ${esc(t)}</a>` : '';
@@ -2232,13 +2260,21 @@ const VIEWS = {
     const TIT = {favoris:'Favoris', commercial:'Commercial', pilotes:'Pilotes', transport:'Transport'};
     let body;
     if (s === 'commercial') body = '<p class="empty">À venir : agents et compagnies du bottin.</p>';
-    else if (s === 'transport') body = `<div class="li" style="flex-wrap:wrap"><span class="li-main"><span class="t">${esc(NAVETTE_DEF.nom)}</span><span class="s">${esc(NAVETTE_DEF.src)}</span></span><span class="row" style="width:100%">${tel(NAVETTE_DEF.tel)}</span></div><p class="sub">Autres services de transport : à venir.</p>`;
+    else if (s === 'transport') {
+      const ligne = x => `<div class="li" style="flex-wrap:wrap"><span class="li-main"><span class="t">${esc(x.nom)}</span><span class="s">${esc(x.src || '')}</span></span><span class="row" style="width:100%">${x.tel ? tel(x.tel) : '<span class="sub">Numéro absent</span>'}</span></div>`;
+      const vue = t === 'port' ? 'port' : 'taxi';
+      const L = vue === 'taxi' ? [...(TELS.transport || []), NAVETTE_DEF] : (TELS.navettesPort || []);
+      body = `<div class="seg">${[['taxi', 'Taxis et navette'], ['port', 'Navettes du port']].map(([v, l]) => `<label class="seg-opt"><input type="radio" name="trv" value="${v}"${vue === v ? ' checked' : ''}><span>${l}</span></label>`).join('')}</div>
+        <div class="stack">${L.map(ligne).join('') || '<p class="empty">Numéros des navettes du port de Montréal : à venir.</p>'}</div>
+        ${vue === 'taxi' && !(TELS.transport || []).length ? '<p class="sub">Numéros des taxis absents : ajoutez le fichier de numéros dans Réglages, Restaurer une sauvegarde.</p>' : ''}`;
+    }
     else {
       const L = s === 'favoris' ? PILOTES.filter(p => favs.includes(fk(p))) : PILOTES;
       body = `<input id="q" type="search" value="${esc(q)}" placeholder="Code, nom ou prénom" aria-label="Chercher dans le bottin" autocomplete="off">
       <div class="stack" id="lst">${L.map(li).join('') || `<p class="empty">${s === 'favoris' ? 'Aucun favori. Touchez le cœur d\'un pilote.' : 'Liste vide.'}</p>`}</div>`;
     }
     return {title:TIT[s] || 'Bottin', html:body, mount: r => {
+      r.querySelectorAll('input[name="trv"]').forEach(i => i.onchange = () => go('bottin', {s, t:i.value}, {replace:true}));
       const qi = r.querySelector('#q'); if (!qi) return;
       const f = () => { const Q = norm(qi.value); stack[stack.length - 1].params = {s, q:qi.value}; r.querySelectorAll('#lst .li').forEach(b => b.hidden = !b.dataset.name.includes(Q)); };
       qi.oninput = f; f();
@@ -2361,7 +2397,16 @@ const VIEWS = {
         const check = () => {
           const prev = r.querySelector('#impPrev');
           let data, prive;
-          try { const j = JSON.parse(r.querySelector('#impTxt').value); data = j && j.data ? j.data : j; prive = j && j.prive; } catch (e) { data = null; }
+          let j = null;
+          try { j = JSON.parse(r.querySelector('#impTxt').value); data = j && j.data ? j.data : j; prive = j && j.prive; } catch (e) { data = null; }
+          if (j && j.type === 'numeros' && j.prive && j.prive.tels) {
+            // Fichier de numéros seulement : ajoute les numéros, sans toucher aux fiches.
+            prev.innerHTML = `<p class="info">Fichier de numéros : ${Object.keys(j.prive.tels).length} rubriques. Vos fiches ne seront pas touchées.</p><div><button class="btn primary block" id="btnNum">Ajouter ces numéros</button></div>`;
+            prev.querySelector('#btnNum').onclick = () => {
+              DB.d.prive = DB.d.prive || {}; DB.d.prive.tels = {...(DB.d.prive.tels || {}), ...j.prive.tels}; DB.save(); hydrate(); toast('Numéros ajoutés'); go('home', {}, {reset:true});
+            };
+            return;
+          }
           if (!data || data.schema !== 1 || !Array.isArray(data.navires) || !Array.isArray(data.notes)) { prev.innerHTML = '<p class="empty">Ce texte n\'est pas une sauvegarde Marine Pilot Pro valide.</p>'; return; }
           prev.innerHTML = `<p class="info">Sauvegarde valide : ${data.navires.length} navires, ${(data.lieux || []).length} lieux, ${data.notes.length} notes et manœuvres, ${(data.affectations || []).length} affectations.</p><div><button class="btn primary block" id="btnImp">Remplacer mes données par cette sauvegarde</button></div>`;
           const bi = prev.querySelector('#btnImp');
@@ -2387,7 +2432,7 @@ function affLi(a, del) {
 function hydrate() {
   const pv = DB.d.prive; if (INJECTE || !pv) return;
   if (Array.isArray(pv.pilotes)) PILOTES.splice(0, PILOTES.length, ...pv.pilotes);
-  if (pv.tels) { if (pv.tels.navette) TELS.navette = String(pv.tels.navette); if (pv.tels.lpa) TELS.lpa = String(pv.tels.lpa); NAVETTE_DEF.tel = TELS.navette || ''; }
+  if (pv.tels) { for (const k in pv.tels) TELS[k] = Array.isArray(pv.tels[k]) ? pv.tels[k] : String(pv.tels[k]); NAVETTE_DEF.tel = TELS.navette || ''; }
 }
 function readBackup() { try { const b = JSON.parse(localStorage.getItem(BACKUP_KEY)); return b && b.data ? b : null; } catch (e) { return null; } }
 function writeBackup() { try { localStorage.setItem(BACKUP_KEY, JSON.stringify({date:nowLocal(), data:DB.d})); } catch (e) {} }
@@ -2421,6 +2466,8 @@ $('#title').onclick = e => { if (e.target.closest('#brandBtn')) go('reglages'); 
 $('#main').addEventListener('click', e => {
   const ap = e.target.closest('[data-appel]'); if (ap) { openAppel(ap.dataset.appel, ap.dataset.id); return; }
   if (e.target.closest('[data-notel]')) { toast('Numéro absent : restaurez votre sauvegarde dans Réglages.'); return; }
+  const apl = e.target.closest('[data-apl]');
+  if (apl) { const x = DB.get('affectations', apl.dataset.apl); if (x) { x.aplAppele = nowLocal(); DB.put('affectations', x); } setTimeout(() => apl.remove(), 300); return; }
   const sa = e.target.closest('[data-start]'); if (sa) { startAff(sa.dataset.start); return; }
   const fi = e.target.closest('[data-finish]'); if (fi) { finishAff(fi.dataset.finish); return; }
   const mt = e.target.closest('[data-meteo]'); if (mt) { openMeteo(mt.dataset.meteo); return; }
