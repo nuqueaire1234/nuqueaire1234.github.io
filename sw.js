@@ -1,5 +1,5 @@
 // Service worker : permet d'ouvrir l'application sans réseau.
-const CACHE = 'propilot-v0.22';
+const CACHE = 'propilot-v0.23';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', e => {

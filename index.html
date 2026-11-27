@@ -307,6 +307,15 @@ a.tel{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 1
 .qbar{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
 .qbtn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:64px;padding:6px 2px;border-radius:12px;border:1px solid var(--line);background:var(--surface-2);color:var(--fg);font:600 13px var(--font-body);letter-spacing:.02em;cursor:pointer}
 .qbtn .ico{width:26px;height:26px;color:var(--accent)}
+.qbar.q3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.qbtn small{display:block;font-size:12px;font-weight:500;color:var(--muted);line-height:1.1;text-align:center}
+.qbtn .lab{display:block;line-height:1.1;text-align:center}
+.vrow{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:center}
+.vrow .with-unit input{width:96px;min-height:52px}
+.vrow .btn{padding:0 8px;font-size:15px;line-height:1.1;white-space:normal}
+.lirow2{display:flex;align-items:center;gap:8px}
+.lirow2 input{flex:1;min-width:0}
+.menu{display:grid;gap:8px}
 .hmrow{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center}
 .hmrow input{min-height:52px;font:500 22px var(--font-mono);letter-spacing:.06em;text-align:center}
 .hmrow .btn{padding:0 12px}
@@ -401,7 +410,7 @@ a.li{text-decoration:none;color:inherit}
 <script>
 (() => {
 'use strict';
-const VERSION = 'v0.22 · vitesses W/L dans les CIP, page Transport, APL clignotant (26 nov. 2026)';
+const VERSION = 'v0.23 · bottin modifiable, listes en pages, feuille en route compacte (26 nov. 2026)';
 const PWA = !!window.MPP_PWA;
 
 /* ---------- Utilitaires ---------- */
@@ -551,6 +560,31 @@ const firstNum = s => { const m = String(s ?? '').replace(',', '.').match(/-?\d+
 const PILOTES = /*PILOTES*/[];
 const TELS = /*TELS*/{};
 const INJECTE = PILOTES.length > 0;
+// Bottin modifiable (v0.23) : une fiche = une rubrique (pilote, commercial, transport, port) + favori. Gardé dans DB.d.prive.bottin, jamais sur le site.
+let BOT = [];
+const BOT_CAT = [['pilote', 'Pilotes'], ['commercial', 'Commercial'], ['transport', 'Transport (taxis et navette)'], ['port', 'Navettes du port']];
+const SECTEURS = [['mien', 'Mon secteur', s => /^montr[ée]al\//i.test(s || '')], ['qc', 'Québec', s => /^qu[ée]bec/i.test(s || '')], ['port', 'Port de Montréal', s => /^port/i.test(s || '')], ['tous', 'Tous', () => true]];
+const botNom = e => e.cat === 'pilote' ? [e.prenom, e.nom].filter(Boolean).join(' ') : e.nom;
+function botSave() { DB.d.prive = DB.d.prive || {pilotes:PILOTES, tels:TELS}; DB.d.prive.bottin = BOT; DB.save(); }
+function botInit() {
+  const pv = DB.d.prive;
+  if (pv && Array.isArray(pv.bottin)) { BOT = pv.bottin; return; }
+  const favs = DB.d.reglages.favoris || [];
+  BOT = [
+    ...PILOTES.map(p => ({id:uid(), cat:'pilote', code:p.code, prenom:p.prenom, nom:p.nom, brevet:p.brevet, secteur:p.secteur, tels:[p.cell, ...(p.autres || [])].filter(Boolean), note:p.doublon ? 'Code en double' : '', src:'Bottin 2026 (CPSLC)', fav:favs.includes(p.code + '|' + p.nom)})),
+    ...(TELS.transport || []).map(x => ({id:uid(), cat:'transport', nom:x.nom, tels:[x.tel].filter(Boolean), src:x.src || '', fav:false})),
+    ...(TELS.navette ? [{id:uid(), cat:'transport', nom:NAVETTE_DEF.nom, tels:[TELS.navette], src:NAVETTE_DEF.src, fav:false}] : []),
+    ...(TELS.navettesPort || []).map(x => ({id:uid(), cat:'port', nom:x.nom, tels:[x.tel].filter(Boolean), src:x.src || '', fav:false}))
+  ];
+  if (BOT.length) botSave();
+}
+// Fichier de numéros : ajoute au bottin les taxis et navettes absents (même nom = déjà là).
+function botMerge(tels) {
+  const add = (L, cat) => (L || []).forEach(x => { if (!BOT.some(e => e.cat === cat && norm(e.nom) === norm(x.nom))) BOT.push({id:uid(), cat, nom:x.nom, tels:[x.tel].filter(Boolean), src:x.src || '', fav:false}); });
+  add(tels.transport, 'transport'); add(tels.navettesPort, 'port');
+  if (tels.navette && !BOT.some(e => norm(e.nom) === norm(NAVETTE_DEF.nom))) BOT.push({id:uid(), cat:'transport', nom:NAVETTE_DEF.nom, tels:[tels.navette], src:NAVETTE_DEF.src, fav:false});
+  if (BOT.length) botSave();
+}
 
 /* ---------- Référentiels v0.14 ---------- */
 const GOUV_DEF = ['Becker','Schilling','Régulier 30°','Régulier 40°','Régulier 70°','Autre'];
@@ -1235,11 +1269,11 @@ function closeSheet(viaUI) {
 const stack = [];
 const TAB_OF = {home:'home', perso:'home', apps:'home', sites:'home', search:'home', noteEdit:'home', manEdit:'home', navires:'home', navire:'home', navireEdit:'home', compteurs:'home',
   affectations:'affectations', aff:'affectations', affEdit:'affectations', affVoy:'affectations', briefing:'affectations', heures:'affectations',
-  riviere:'riviere', lieux:'riviere', lieu:'riviere', lieuEdit:'riviere', degagements:'riviere',
+  liste:'home', botEdit:'home', riviere:'riviere', lieux:'riviere', lieu:'riviere', lieuEdit:'riviere', degagements:'riviere',
   reference:'reference', regles:'reference'};
 const TABS_M = [['riviere', 'ship', 'Rivière'], ['affectations', 'note', 'Fiches'], ['home', 'home', 'Accueil'], ['bottin', 'book', 'Bottin'], ['reference', 'clip', 'Référence']];
 const TABS_B = [['favoris', 'heart', 'Favoris'], ['commercial', 'ship', 'Commercial'], ['home', 'home', 'Accueil'], ['pilotes', 'wheel', 'Pilotes'], ['transport', 'taxi', 'Transport']];
-const bottinDef = () => (DB.d.reglages.favoris || []).length ? 'favoris' : 'pilotes';
+const bottinDef = () => BOT.some(e => e.fav) ? 'favoris' : 'pilotes';
 function drawTabs(top) {
   const isB = top.view === 'bottin', cur = isB ? (top.params.s || bottinDef()) : TAB_OF[top.view];
   $('#tabs').innerHTML = (isB ? TABS_B : TABS_M).map(([t, i, l]) => {
@@ -1790,7 +1824,7 @@ const VIEWS = {
       ['Lois, règlements et procédures', 'Pilotage, Port de Montréal 2025, Voie maritime 2026, hiver'], ['Corporation CPSLC', 'Bulletins, règlement intérieur, politiques']];
     return {title:'Référence', html:`
       <div class="tiles">
-        <button class="tile" data-go="bottin">${ic('wheel')}<span>Bottin<small>${PILOTES.length} pilotes · navette</small></span></button>
+        <button class="tile" data-go="bottin">${ic('wheel')}<span>Bottin<small>${BOT.filter(e => e.cat === 'pilote').length} pilotes · transport</small></span></button>
         <button class="tile" data-go="regles">${ic('note')}<span>Règles du port<small>DSQ, chenal, mouillages</small></span></button>
         <button class="tile" data-go="degagements">${ic('bridge')}<span>Dégagements aériens<small>ATL 112</small></span></button>
         <button class="tile" data-go="compteurs">${ic('count')}<span>Compteurs<small>Stretch et année</small></span></button>
@@ -1808,6 +1842,31 @@ const VIEWS = {
   },
 
   /* Navires */
+  liste({k}) {
+    const NOMS = {gouvernail:'Gouvernails', type:'Types de navire', cargo:'Cargaisons'};
+    if (!NOMS[k]) return VIEWS.notFound();
+    const L = DB.d.reglages.listes[k] = DB.d.reglages.listes[k] || [];
+    // Renommer : met aussi à jour les navires (gouvernail, type) ou les fiches (cargaison) qui utilisent l'ancien nom.
+    const renomme = (ancien, neuf) => {
+      if (k === 'cargo') DB.list('affectations').forEach(a => { if (a.cargo === ancien) a.cargo = neuf; });
+      else DB.list('navires').forEach(n => { if (n[k] === ancien) n[k] = neuf; });
+    };
+    return {title:NOMS[k], html:`
+      <div class="toolbar"><input id="lNew" type="text" placeholder="Ajouter…" aria-label="Ajouter à la liste" autocomplete="off"><button class="btn primary" id="lAdd">${ic('plus', 'sm')} Ajouter</button></div>
+      <div class="stack">${L.map((v, i) => `<div class="lirow2"><input data-li="${i}" type="text" value="${esc(v)}" aria-label="Modifier ${esc(v)}" autocomplete="off"><button class="icon-btn sm" data-ldel="${i}" aria-label="Supprimer ${esc(v)}" style="margin-left:0">${ic('trash')}</button></div>`).join('') || '<p class="empty">Liste vide.</p>'}</div>
+      <p class="hint">Touchez un nom pour le modifier. Un nom modifié est aussi changé dans les navires et les fiches qui l'utilisent.</p>`, mount: r => {
+      const rer = () => go('liste', {k}, {replace:true});
+      const add = () => { const v = r.querySelector('#lNew').value.trim(); if (!v) return; if (L.some(x => norm(x) === norm(v))) { toast('Déjà dans la liste'); return; } L.push(v); DB.save(); rer(); };
+      r.querySelector('#lAdd').onclick = add; r.querySelector('#lNew').onkeydown = e => { if (e.key === 'Enter') add(); };
+      r.querySelectorAll('[data-li]').forEach(i => i.onchange = () => {
+        const n = i.value.trim(), j = +i.dataset.li, ancien = L[j];
+        if (!n) { i.value = ancien; return; }
+        if (L.some((x, m) => m !== j && norm(x) === norm(n))) { toast('Déjà dans la liste'); i.value = ancien; return; }
+        L[j] = n; renomme(ancien, n); DB.save(); toast('Modifié');
+      });
+      r.querySelectorAll('[data-ldel]').forEach(b => b.onclick = () => confirmInline(b, `Retirer « ${L[+b.dataset.ldel]} » de la liste ?`, () => { L.splice(+b.dataset.ldel, 1); DB.save(); rer(); }, 'Retirer'));
+    }};
+  },
   navires() {
     const list = [...DB.list('navires')].sort(byName);
     const li = n => {
@@ -1858,7 +1917,11 @@ const VIEWS = {
           if (dup) { toast('Ce navire existe déjà : voici sa fiche.'); go('navire', {id:dup.id}, {replace:true}); return; }
           const s = DB.put('navires', {...n, ...o}); toast('Navire enregistré'); go('navire', {id:s.id}, {replace:true});
         },
-        onDelete: () => { DB.del('navires', id); toast('Navire supprimé'); dropFromStack(id); }
+        onDelete: () => {
+          const nb = DB.list('affectations').filter(a => a.navireId === id).length;
+          if (nb) { toast(`Impossible : navire utilisé dans ${nb} fiche${nb > 1 ? 's' : ''} d'affectation.`); return; }
+          DB.del('navires', id); toast('Navire supprimé'); dropFromStack(id);
+        }
       })};
   },
 
@@ -2088,7 +2151,7 @@ const VIEWS = {
     const tm = teMax(a), typ = isPC(nav.type) ? 'pc' : 'au', ta = tirantAir(nav, a), traj = tempsTrajet(a), st = a.statut || 'fini';
     const tugs = [['Avant', a.tugAvId], ['Arrière', a.tugArId]].filter(x => x[1]);
     const journal = [...(a.journal || [])].sort((x, y) => (x.h || '').localeCompare(y.h || ''));
-    const pil = PILOTES.map(p => `<option value="${esc(p.code)} — ${esc(p.prenom)} ${esc(p.nom)}">`).join('');
+    const pil = BOT.filter(e => e.cat === 'pilote').map(p => `<option value="${esc(p.code || '')} — ${esc(botNom(p))}">`).join('');
     const KV = (kk, v) => v == null || v === '' ? '' : `<span><i>${esc(kk)}</i><b>${esc(v)}</b></span>`;
     const KT = (kk, v) => v ? `<span class="wrap"><i>${esc(kk)}</i>${esc(v)}</span>` : '';
     const pas = a.passages || {}, pasTxt = Object.keys(pas).map(c => KV(c, pas[c])).join('');
@@ -2098,11 +2161,9 @@ const VIEWS = {
       ? `<button class="btn primary block tall" data-start="${id}">▶ Démarrer l'affectation</button>`
       : st === 'route'
         ? `<div class="qbar"><button class="qbtn" data-go="affVoy" data-id="${id}">${ic('ship')}Navire</button><button class="qbtn" data-meteo="${id}">${ic('meteo')}Météo</button><button class="qbtn" data-niv="${id}">${ic('vague')}W/L</button><button class="qbtn" data-appel="depart" data-id="${id}">${ic('vhf')}Départ</button></div>
-          <button class="btn block" data-go="briefing" data-aff-id="${id}">${ic('eye')} Notes de manœuvre${al ? ` · ${al} alerte${al > 1 ? 's' : ''}` : ''}</button>
-          <div class="row"><button class="btn" data-go="bottin" data-s="transport">${ic('taxi')} Transport</button><button class="btn" data-finish="${id}">⚓ Débarqué</button></div>
-          <div class="row"><button class="btn tall" data-go="heures" data-id="${id}">⏱ CIP</button><button class="btn tall" data-t0="${id}"><span>⏱ Temps à ${esc(t0nom)}<small>${esc(t0h || 'à entrer')}</small></span></button></div>
-          ${versLambert(a) ? `<button class="btn block" data-appel="tracy" data-id="${id}">${ic('vhf')} Appel à Tracy (Voie maritime)</button>` : ''}
-          ${a.aplAppele ? '' : TELS.lpa ? `<a class="btn block tall blink" data-apl="${id}" href="${esc(telHref(TELS.lpa))}">${ic('phone')} Appeler l'APL</a>` : `<button class="btn block tall blink" data-notel="1">${ic('phone')} Appeler l'APL</button>`}`
+          <div class="qbar q3"><button class="qbtn" data-go="briefing" data-aff-id="${id}">${ic('eye')}<span class="lab">Notes de manœuvre</span>${al ? `<small>${al} alerte${al > 1 ? 's' : ''}</small>` : ''}</button><button class="qbtn" data-go="bottin" data-s="transport">${ic('taxi')}<span class="lab">Transport</span></button><button class="qbtn" data-t0="${id}"><span class="lab">⏱ Temps à ${esc(t0nom)}</span><small>${esc(t0h || 'à entrer')}</small></button></div>
+          <div class="row"><button class="btn tall" data-go="heures" data-id="${id}">⏱ CIP</button><button class="btn tall" data-finish="${id}">⚓ Débarqué</button></div>
+          ${a.aplAppele ? (versLambert(a) ? `<button class="btn block tall" data-appel="tracy" data-id="${id}">${ic('vhf')} Appel à Tracy (Voie maritime)</button>` : '') : TELS.lpa ? `<a class="btn block tall blink" data-apl="${id}" href="${esc(telHref(TELS.lpa))}">${ic('phone')} Appeler l'APL</a>` : `<button class="btn block tall blink" data-notel="1">${ic('phone')} Appeler l'APL</button>`}`
         : `<div class="row"><button class="btn" data-go="heures" data-id="${id}">⏱ CIP</button><button class="btn" data-appel="depart" data-id="${id}">${ic('vhf')} Résumé</button></div>
           <button class="btn block" data-finish="${id}">⚓ Récapitulatif du débarquement</button>`;
 
@@ -2174,9 +2235,8 @@ const VIEWS = {
     return {title:'CIP (Calling in Point)', html:`
       <div class="sub">${esc(a.navireId ? pickLabel('navires', a.navireId) : '')} · parti à <b>${esc(a.hDepart || '—')}</b>${a.hDepart ? '' : ' (entrez l\'heure de départ dans la fiche)'}</div>
       <div class="seg">${[['montant', 'Montant'], ['descendant', 'Descendant']].map(([v, l]) => `<label class="seg-opt"><input type="radio" name="hsens" value="${v}"${T.sens === v ? ' checked' : ''}><span>${l}</span></label>`).join('')}</div>
-      <div class="grid2"><label class="field"><span class="lbl">Vitesse partout</span><span class="with-unit"><input id="hv" type="text" inputmode="decimal" value="${fmtNum(T.vDef)}"><span>nd</span></span></label>
-        <div class="field"><span class="lbl">&nbsp;</span><button class="btn" id="hvAll">Même vitesse partout</button></div></div>
-      <button class="btn block" id="hvWL">${ic('vague')} Vitesses W/L (niveaux d'eau)</button>
+      <span class="lbl">Vitesse sur le fond</span>
+      <div class="vrow"><span class="with-unit"><input id="hv" type="text" inputmode="decimal" maxlength="4" value="${fmtNum(T.vDef)}" aria-label="Vitesse partout"><span>nd</span></span><button class="btn" id="hvAll">Même vitesse</button><button class="btn" id="hvWL">Vitesses W/L</button></div>
       <div class="pts"><div class="pt hd"><span>Point</span><span>Vitesse</span><span>Prévu</span><span>Réel</span></div>
       ${T.rows.map(r => `<div class="pt"><span class="n">${esc(r.nom)}<small>${r.dist != null ? fmtNum(r.dist) + ' NM' + (r.doute ? ' · à vérifier' : '') : 'départ'}</small></span>
         ${r.k ? `<input data-vseg="${r.k}" type="text" inputmode="decimal" value="${fmtNum(r.v)}" aria-label="Vitesse vers ${esc(r.nom)}">` : '<span></span>'}
@@ -2251,37 +2311,73 @@ const VIEWS = {
   /* Bottin téléphonique */
   bottin({q = '', s = '', t = ''}) {
     s = s || bottinDef();
-    const favs = DB.d.reglages.favoris, fk = p => p.code + '|' + p.nom;
-    const tel = t => t ? `<a class="tel" href="${esc(telHref(t))}">📞 ${esc(t)}</a>` : '';
-    const li = p => `<div class="li" data-name="${esc(norm(p.code + ' ' + p.prenom + ' ' + p.nom + ' ' + p.secteur))}" style="flex-wrap:wrap">
-      <span class="li-main"><span class="t"><span class="code">${esc(p.code)}</span> ${esc(p.prenom)} ${esc(p.nom)}</span><span class="s">Brevet ${esc(p.brevet)} · ${esc(p.secteur)}${p.doublon ? ' · <b>code en double</b>' : ''}</span></span>
-      <button class="favb" data-fav="${esc(fk(p))}" aria-pressed="${favs.includes(fk(p))}" aria-label="Favori : ${esc(p.prenom)} ${esc(p.nom)}">${ic('heart')}</button>
-      <span class="row" style="width:100%">${tel(p.cell)}${(p.autres || []).map(tel).join('')}</span></div>`;
     const TIT = {favoris:'Favoris', commercial:'Commercial', pilotes:'Pilotes', transport:'Transport'};
-    let body;
-    if (s === 'commercial') body = '<p class="empty">À venir : agents et compagnies du bottin.</p>';
+    const tel = x => `<a class="tel" href="${esc(telHref(x))}">📞 ${esc(x)}</a>`;
+    const li = e => `<div class="li" data-name="${esc(norm([e.code, e.prenom, e.nom, e.secteur, e.src].filter(Boolean).join(' ')))}" style="flex-wrap:wrap">
+      <span class="li-main"><span class="t">${e.code ? `<span class="code">${esc(e.code)}</span> ` : ''}${esc(botNom(e))}</span><span class="s">${esc([e.brevet ? 'Brevet ' + e.brevet : '', e.secteur, e.cat !== 'pilote' ? e.src : '', e.note].filter(Boolean).join(' · '))}</span></span>
+      <button class="favb" data-fav="${e.id}" aria-pressed="${!!e.fav}" aria-label="Favori : ${esc(botNom(e))}">${ic('heart')}</button>
+      <button class="icon-btn sm" data-go="botEdit" data-id="${e.id}" aria-label="Modifier ${esc(botNom(e))}" style="margin-left:0">${ic('edit')}</button>
+      <span class="row" style="width:100%">${(e.tels || []).map(tel).join('') || '<span class="sub">Aucun numéro</span>'}</span></div>`;
+    let L, seg = '', catNew = 'pilote';
+    if (s === 'favoris') { L = BOT.filter(e => e.fav); catNew = 'commercial'; }
+    else if (s === 'commercial') { L = BOT.filter(e => e.cat === 'commercial'); catNew = 'commercial'; }
     else if (s === 'transport') {
-      const ligne = x => `<div class="li" style="flex-wrap:wrap"><span class="li-main"><span class="t">${esc(x.nom)}</span><span class="s">${esc(x.src || '')}</span></span><span class="row" style="width:100%">${x.tel ? tel(x.tel) : '<span class="sub">Numéro absent</span>'}</span></div>`;
-      const vue = t === 'port' ? 'port' : 'taxi';
-      const L = vue === 'taxi' ? [...(TELS.transport || []), NAVETTE_DEF] : (TELS.navettesPort || []);
-      body = `<div class="seg">${[['taxi', 'Taxis et navette'], ['port', 'Navettes du port']].map(([v, l]) => `<label class="seg-opt"><input type="radio" name="trv" value="${v}"${vue === v ? ' checked' : ''}><span>${l}</span></label>`).join('')}</div>
-        <div class="stack">${L.map(ligne).join('') || '<p class="empty">Numéros des navettes du port de Montréal : à venir.</p>'}</div>
-        ${vue === 'taxi' && !(TELS.transport || []).length ? '<p class="sub">Numéros des taxis absents : ajoutez le fichier de numéros dans Réglages, Restaurer une sauvegarde.</p>' : ''}`;
+      const vue = t === 'port' ? 'port' : 'transport'; catNew = vue;
+      L = BOT.filter(e => e.cat === vue);
+      seg = `<div class="seg">${[['transport', 'Taxis et navette'], ['port', 'Navettes du port']].map(([v, l]) => `<label class="seg-opt"><input type="radio" name="trv" value="${v}"${vue === v ? ' checked' : ''}><span>${l}</span></label>`).join('')}</div>`;
+    } else {
+      const sc = SECTEURS.find(x => x[0] === t) || SECTEURS[0];
+      L = BOT.filter(e => e.cat === 'pilote' && sc[2](e.secteur));
+      seg = `<div class="seg">${SECTEURS.map(([v, l]) => `<label class="seg-opt"><input type="radio" name="sect" value="${v}"${sc[0] === v ? ' checked' : ''}><span>${l}</span></label>`).join('')}</div>`;
     }
-    else {
-      const L = s === 'favoris' ? PILOTES.filter(p => favs.includes(fk(p))) : PILOTES;
-      body = `<input id="q" type="search" value="${esc(q)}" placeholder="Code, nom ou prénom" aria-label="Chercher dans le bottin" autocomplete="off">
-      <div class="stack" id="lst">${L.map(li).join('') || `<p class="empty">${s === 'favoris' ? 'Aucun favori. Touchez le cœur d\'un pilote.' : 'Liste vide.'}</p>`}</div>`;
-    }
-    return {title:TIT[s] || 'Bottin', html:body, mount: r => {
-      r.querySelectorAll('input[name="trv"]').forEach(i => i.onchange = () => go('bottin', {s, t:i.value}, {replace:true}));
-      const qi = r.querySelector('#q'); if (!qi) return;
-      const f = () => { const Q = norm(qi.value); stack[stack.length - 1].params = {s, q:qi.value}; r.querySelectorAll('#lst .li').forEach(b => b.hidden = !b.dataset.name.includes(Q)); };
+    const cle = e => e.cat === 'pilote' ? `${e.nom || ''} ${e.prenom || ''}` : e.nom || '';
+    L = [...L].sort((x, y) => cle(x).localeCompare(cle(y), 'fr'));
+    const vide = s === 'favoris' ? 'Aucun favori. Touchez le cœur d\'une fiche.' : !BOT.length ? 'Bottin vide : restaurez votre sauvegarde dans Réglages, ou touchez « Ajouter ».' : 'Liste vide. Touchez « Ajouter ».';
+    const body = `${seg}<input id="q" type="search" value="${esc(q)}" placeholder="Chercher" aria-label="Chercher dans le bottin" autocomplete="off">
+      <div class="stack" id="lst">${L.map(li).join('') || `<p class="empty">${vide}</p>`}</div>`;
+    return {title:TIT[s] || 'Bottin', action:{label:'Ajouter', icon:'plus', fn:() => go('botEdit', {cat:catNew})}, html:body, mount: r => {
+      r.querySelectorAll('input[name="trv"]').forEach(i => i.onchange = () => go('bottin', {s, t:i.value === 'port' ? 'port' : ''}, {replace:true}));
+      r.querySelectorAll('input[name="sect"]').forEach(i => i.onchange = () => go('bottin', {s, t:i.value}, {replace:true}));
+      const qi = r.querySelector('#q');
+      const f = () => { const Q = norm(qi.value); stack[stack.length - 1].params = {s, t, q:qi.value}; r.querySelectorAll('#lst .li').forEach(b => b.hidden = !b.dataset.name.includes(Q)); };
       qi.oninput = f; f();
       r.querySelectorAll('[data-fav]').forEach(b => b.onclick = () => {
-        const k = b.dataset.fav, i = favs.indexOf(k); if (i >= 0) favs.splice(i, 1); else favs.push(k); DB.save();
-        if (s === 'favoris') go('bottin', {s, q:qi.value}, {replace:true}); else b.setAttribute('aria-pressed', String(i < 0));
+        const e = BOT.find(x => x.id === b.dataset.fav); if (!e) return; e.fav = !e.fav; botSave();
+        if (s === 'favoris') go('bottin', {s, q:qi.value}, {replace:true}); else b.setAttribute('aria-pressed', String(e.fav));
       });
+    }};
+  },
+  botEdit({id, cat = 'pilote'}) {
+    const e = id ? BOT.find(x => x.id === id) : null; if (id && !e) return VIEWS.notFound();
+    const o = e || {cat, tels:[], fav:false};
+    const F = (k, l, v, ph = '') => `<label class="field"><span class="lbl">${esc(l)}</span><input id="b_${k}" type="text" value="${esc(v || '')}" placeholder="${esc(ph)}" autocomplete="off"></label>`;
+    return {title:e ? 'Modifier la fiche' : 'Nouvelle fiche', action:{label:'Enregistrer', fn:() => $('#bOk')?.click()}, html:`
+      <span class="lbl">Rubrique</span>
+      <div class="seg" style="flex-wrap:wrap">${BOT_CAT.map(([v, l]) => `<label class="seg-opt"><input type="radio" name="bcat" value="${v}"${o.cat === v ? ' checked' : ''}><span>${l}</span></label>`).join('')}</div>
+      <div id="bPil">${F('prenom', 'Prénom', o.prenom)}
+        <div class="grid2">${F('code', 'Code', o.code)}${F('brevet', 'Brevet', o.brevet)}</div>
+        <span class="lbl">Secteur</span>
+        <div class="seg" style="flex-wrap:wrap">${[['Montréal/Trois-Rivières', 'Montréal / Trois-Rivières'], ['Québec/Trois-Rivières', 'Québec / Trois-Rivières'], ['Port de Montréal', 'Port de Montréal']].map(([v, l]) => `<label class="seg-opt"><input type="radio" name="bsect" value="${esc(v)}"${o.secteur === v ? ' checked' : ''}><span>${l}</span></label>`).join('')}</div></div>
+      ${F('nom', 'Nom', o.nom)}
+      <label class="field"><span class="lbl">Téléphones (un par ligne)</span><textarea id="b_tels" placeholder="514 555-1234, poste 3">${esc((o.tels || []).join('\n'))}</textarea></label>
+      ${F('src', 'Source', o.src, 'Ex. Bottin 2026, carte d\'affaires…')}
+      ${F('note', 'Remarque', o.note)}
+      <label class="chk"><input type="checkbox" id="b_fav"${o.fav ? ' checked' : ''}> Favori</label>
+      <button class="btn primary block tall" id="bOk">Enregistrer</button>
+      ${e ? '<button class="btn block" id="bDel">Supprimer la fiche</button>' : ''}`, mount: r => {
+      const pil = () => r.querySelector('input[name="bcat"]:checked')?.value === 'pilote';
+      const maj = () => { r.querySelector('#bPil').hidden = !pil(); };
+      r.querySelectorAll('input[name="bcat"]').forEach(i => i.onchange = maj); maj();
+      const g = k => r.querySelector('#b_' + k).value.trim();
+      r.querySelector('#bOk').onclick = () => {
+        const n = {...o, cat:r.querySelector('input[name="bcat"]:checked').value, nom:g('nom'), tels:g('tels').split('\n').map(x => x.trim()).filter(Boolean), src:g('src'), note:g('note'), fav:r.querySelector('#b_fav').checked};
+        if (n.cat === 'pilote') Object.assign(n, {prenom:g('prenom'), code:g('code').toUpperCase(), brevet:g('brevet'), secteur:r.querySelector('input[name="bsect"]:checked')?.value || o.secteur || ''});
+        if (!n.nom) { toast('Entrez le nom'); r.querySelector('#b_nom').focus(); return; }
+        if (e) Object.assign(e, n); else BOT.push({...n, id:uid()});
+        botSave(); toast('Fiche enregistrée'); back();
+      };
+      const d = r.querySelector('#bDel');
+      if (d) d.onclick = () => confirmInline(d, `Supprimer ${botNom(e)} du bottin ? C'est définitif.`, () => { BOT = BOT.filter(x => x.id !== id); botSave(); toast('Fiche supprimée'); back(); }, 'Supprimer');
     }};
   },
 
@@ -2348,8 +2444,8 @@ const VIEWS = {
       <span class="lbl">Bouton d'affectation active, la nuit</span>
       <div class="seg">${[['on','Pulsation lente'],['off','Aucun clignotement']].map(([v, l]) => `<label class="seg-opt"><input type="radio" name="pulse" value="${v}"${(DB.d.reglages.pulseNuit || 'on') === v ? ' checked' : ''}><span>${l}</span></label>`).join('')}</div>
       <h2 class="h2">Mes listes</h2>
-      ${LISTES.map(([k, l]) => `<h3 class="grp">${esc(l)}</h3><div class="chips">${liste(k).map((v, i) => `<span class="lchip">${esc(v)}<button data-ldel="${k}" data-i="${i}" aria-label="Retirer ${esc(v)}">✕</button></span>`).join('') || '<span class="sub">Liste vide.</span>'}</div>
-        <div class="toolbar"><input data-lin="${k}" type="text" placeholder="Ajouter à la liste…" aria-label="Ajouter à ${esc(l)}" autocomplete="off"><button class="btn" data-ladd="${k}">Ajouter</button></div>`).join('')}
+      <div class="menu">${LISTES.map(([k, l]) => `<button class="li" data-go="liste" data-k="${k}"><span class="li-main"><span class="t">${esc(l)}</span><span class="s">${liste(k).length} élément${liste(k).length > 1 ? 's' : ''}</span></span>${ic('chev')}</button>`).join('')}
+        <button class="li" data-go="navires"><span class="li-main"><span class="t">Navires</span><span class="s">${DB.list('navires').length} navires</span></span>${ic('chev')}</button></div>
       <p class="hint">Les quais, mouillages et remorqueurs s'ajoutent ou se suppriment dans Quai / Rivière.</p>
       <h2 class="h2">Mes données</h2>
       ${specsHTML([{k:'Navires', v:String(d.navires.length)}, {k:'Quais & lieux', v:String(d.lieux.length)}, {k:'Notes', v:String(d.notes.length - nm)}, {k:'Manœuvres', v:String(nm)}, {k:'Affectations', v:String(d.affectations.length)}, {k:'Stretches', v:String(d.stretches.length)}])}
@@ -2372,10 +2468,7 @@ const VIEWS = {
         r.querySelectorAll('input[name="jour"]').forEach(i => i.onchange = () => { DB.d.reglages.jour = i.value; DB.save(); applyTheme(); });
         r.querySelectorAll('input[name="pulse"]').forEach(i => i.onchange = () => { DB.d.reglages.pulseNuit = i.value; DB.save(); applyTheme(); });
         const rer = () => go('reglages', {}, {replace:true});
-        r.querySelectorAll('[data-ladd]').forEach(b => b.onclick = () => { const k = b.dataset.ladd, inp = r.querySelector(`[data-lin="${k}"]`), v = inp.value.trim();
-          if (!v) return; if (liste(k).some(x => norm(x) === norm(v))) { toast('Déjà dans la liste'); return; } DB.d.reglages.listes[k].push(v); DB.save(); rer(); });
-        r.querySelectorAll('[data-ldel]').forEach(b => b.onclick = () => { DB.d.reglages.listes[b.dataset.ldel].splice(+b.dataset.i, 1); DB.save(); rer(); });
-        const payload = () => JSON.stringify({app:'marine-pilot-pro', schema:1, exporte:nowLocal(), data:{...DB.d, prive:undefined}, prive:{pilotes:PILOTES, tels:TELS}});
+        const payload = () => JSON.stringify({app:'marine-pilot-pro', schema:1, exporte:nowLocal(), data:{...DB.d, prive:undefined}, prive:{pilotes:PILOTES, tels:TELS, bottin:BOT}});
         r.querySelector('#btnDl').onclick = () => {
           try {
             const a = document.createElement('a');
@@ -2403,7 +2496,7 @@ const VIEWS = {
             // Fichier de numéros seulement : ajoute les numéros, sans toucher aux fiches.
             prev.innerHTML = `<p class="info">Fichier de numéros : ${Object.keys(j.prive.tels).length} rubriques. Vos fiches ne seront pas touchées.</p><div><button class="btn primary block" id="btnNum">Ajouter ces numéros</button></div>`;
             prev.querySelector('#btnNum').onclick = () => {
-              DB.d.prive = DB.d.prive || {}; DB.d.prive.tels = {...(DB.d.prive.tels || {}), ...j.prive.tels}; DB.save(); hydrate(); toast('Numéros ajoutés'); go('home', {}, {reset:true});
+              DB.d.prive = DB.d.prive || {}; DB.d.prive.tels = {...(DB.d.prive.tels || {}), ...j.prive.tels}; DB.save(); hydrate(); botMerge(j.prive.tels); toast('Numéros ajoutés'); go('home', {}, {reset:true});
             };
             return;
           }
@@ -2430,9 +2523,10 @@ function affLi(a, del) {
   return del ? `<div class="lirow">${li}<button class="icon-btn sm" data-affdel="${a.id}" aria-label="Supprimer la fiche">${ic('trash')}</button></div>` : li;
 }
 function hydrate() {
-  const pv = DB.d.prive; if (INJECTE || !pv) return;
+  const pv = DB.d.prive; if (INJECTE || !pv) { botInit(); return; }
   if (Array.isArray(pv.pilotes)) PILOTES.splice(0, PILOTES.length, ...pv.pilotes);
   if (pv.tels) { for (const k in pv.tels) TELS[k] = Array.isArray(pv.tels[k]) ? pv.tels[k] : String(pv.tels[k]); NAVETTE_DEF.tel = TELS.navette || ''; }
+  botInit();
 }
 function readBackup() { try { const b = JSON.parse(localStorage.getItem(BACKUP_KEY)); return b && b.data ? b : null; } catch (e) { return null; } }
 function writeBackup() { try { localStorage.setItem(BACKUP_KEY, JSON.stringify({date:nowLocal(), data:DB.d})); } catch (e) {} }
